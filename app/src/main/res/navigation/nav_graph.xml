@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<navigation xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/nav_graph"
+    app:startDestination="@id/idleStateFragment">
+
+    <fragment
+        android:id="@+id/idleStateFragment"
+        android:name="com.top.parkingcharges.fragment.IdleStateFragment" />
+
+    <fragment
+        android:id="@+id/paymentStateFragment"
+        android:name="com.top.parkingcharges.fragment.PaymentStateFragment" />
+
+    <fragment
+        android:id="@+id/releaseStateFragment"
+        android:name="com.top.parkingcharges.fragment.ReleaseStateFragment" />
+</navigation>
