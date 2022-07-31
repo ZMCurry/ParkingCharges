@@ -4,8 +4,10 @@ import android.animation.ArgbEvaluator
 import android.animation.ObjectAnimator
 import android.annotation.SuppressLint
 import android.content.res.Resources
+import android.media.AudioManager
 import android.os.Bundle
 import android.os.SystemClock
+import android.speech.tts.TextToSpeech
 import android.util.Log
 import android.view.View
 import android.view.Window
@@ -42,9 +44,10 @@ import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import java.io.File
+import java.util.*
 
 
-class MainActivity : AppCompatActivity() {
+class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
 
     private lateinit var mNetty: NettyUtil
 
@@ -53,6 +56,8 @@ class MainActivity : AppCompatActivity() {
     private val viewModel by viewModels<MainViewModel>()
 
     private lateinit var navController: NavController
+
+    private lateinit var mSpeech: TextToSpeech
 
     @SuppressLint("SetTextI18n")
     @Suppress("DEPRECATION")
@@ -65,6 +70,8 @@ class MainActivity : AppCompatActivity() {
         )
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
+
+        mSpeech = TextToSpeech(baseContext, this)
         navController =
             (supportFragmentManager.findFragmentById(R.id.fcv) as NavHostFragment).navController
 
@@ -184,6 +191,11 @@ class MainActivity : AppCompatActivity() {
                     HostDialogFragment::class.java.simpleName
                 )
             }
+        }
+
+        lifecycleScope.launch {
+            delay(3000)
+            speak()
         }
     }
 
@@ -362,5 +374,37 @@ class MainActivity : AppCompatActivity() {
         //切换背景的周期
         private const val DURATION_SLIDE = 10000L
 
+    }
+
+    private fun speak() {
+        val utteranceId = System.currentTimeMillis()
+        val ttsOptions = HashMap<String, String>()
+        ttsOptions[TextToSpeech.Engine.KEY_PARAM_UTTERANCE_ID] =
+            utteranceId.toString() //utterance，这个参数随便写，用于监听播报完成的回调中
+        ttsOptions[TextToSpeech.Engine.KEY_PARAM_VOLUME] = 1.toString() //音量
+        ttsOptions[TextToSpeech.Engine.KEY_PARAM_STREAM] =
+            AudioManager.STREAM_NOTIFICATION.toString() //播放类型
+        val ret = mSpeech.speak("停车时间5小时3分钟，请交费25元", TextToSpeech.QUEUE_FLUSH, ttsOptions)
+        if (ret == TextToSpeech.SUCCESS) {
+            //播报成功
+        }
+    }
+
+    override fun onInit(status: Int) {
+        if (this::mSpeech.isInitialized) {
+            val isSupportChinese: Int = mSpeech.isLanguageAvailable(Locale.CHINESE) //是否支持中文
+            TextToSpeech.getMaxSpeechInputLength() //最大播报文本长度
+            if (isSupportChinese == TextToSpeech.LANG_AVAILABLE) {
+                val setLanRet: Int = mSpeech.setLanguage(Locale.CHINESE) //设置语言
+                val setSpeechRateRet: Int = mSpeech.setSpeechRate(1.0f) //设置语
+                val setPitchRet: Int = mSpeech.setPitch(1.0f) //设置音量
+                val defaultEngine: String = mSpeech.defaultEngine //默认引擎
+                if (status == TextToSpeech.SUCCESS) {
+                    //初始化TextToSpeech引擎成功，初始化成功后才可以play等
+                }
+            }
+        } else {
+            //初始化TextToSpeech引擎失败
+        }
     }
 }
