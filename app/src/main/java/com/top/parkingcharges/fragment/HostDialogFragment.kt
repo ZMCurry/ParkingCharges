@@ -43,7 +43,7 @@ class HostDialogFragment : DialogFragment() {
                 viewModel.updateHost(
                     HostPort(
                         binding.etHost.text!!.trim().toString(),
-                        binding.etPort.text!!.trim().toString().toInt()
+                        binding.etPort.text!!.trim().toString()
                     )
                 )
                 dismissAllowingStateLoss()
@@ -69,7 +69,7 @@ class HostDialogFragment : DialogFragment() {
 
     private fun validateHost(): Boolean {
         if (binding.etHost.text?.trim().isNullOrBlank()) {
-            showError(binding.tilHost, "服务器地址不能为空")
+            showError(binding.tilHost, "串口设备不能为空")
             return false
         }
         return true
@@ -77,7 +77,7 @@ class HostDialogFragment : DialogFragment() {
 
     private fun validatePort(): Boolean {
         if (binding.etPort.text?.trim().isNullOrBlank()) {
-            showError(binding.tilPort, "端口号不能为空")
+            showError(binding.tilPort, "波特率不能为空")
             return false
         }
         return true

@@ -19,12 +19,20 @@ import com.top.parkingcharges.MsgType
 import com.top.parkingcharges.entity.NettyResult
 import com.top.parkingcharges.entity.PaymentInfo
 import com.top.parkingcharges.entity.ReleaseInfo
-import kotlinx.coroutines.flow.*
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.asSharedFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.firstOrNull
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
-import java.util.*
+import java.util.UUID
 
 
 val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "settings")
+
+const val KEY_SERIAL_PORT = "KEY_SERIAL_PORT"
+const val KEY_BAUD_RATE = "KEY_BAUD_RATE"
 
 class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val mApplication = application
@@ -40,8 +48,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun updateHost(hostPort: HostPort) {
         viewModelScope.launch {
             mApplication.dataStore.edit { preferences ->
-                preferences[stringPreferencesKey("host")] = hostPort.host
-                preferences[intPreferencesKey("port")] = hostPort.port
+                preferences[stringPreferencesKey(KEY_SERIAL_PORT)] = hostPort.serialPort
+                preferences[stringPreferencesKey(KEY_BAUD_RATE)] = hostPort.baudRate
             }
             _newestHost.emit(hostPort)
         }
@@ -85,6 +93,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     )
                     emit(state.copy(page = Page.PAYMENT, paymentInfo = action.paymentInfo))
                 }
+
                 is Action.Release -> {
                     _event.emit(
                         Event.SendMsg(
@@ -124,6 +133,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                                 )
                             )
                         }
+
                         MsgType.PaymentReceive.msgType -> {
                             try {
                                 val paymentInfo = GsonUtils.fromJson(data, PaymentInfo::class.java)
@@ -132,6 +142,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                                 dispatch(Action.Payment(null))
                             }
                         }
+
                         MsgType.ReleaseReceive.msgType -> {
                             try {
                                 val releaseInfo =
@@ -165,7 +176,7 @@ data class ViewState(
     val defaultQrCode: String = "haha"
 )
 
-data class HostPort(val host: String, val port: Int)
+data class HostPort(val serialPort: String, val baudRate: String)
 
 enum class Page {
     IDLE, PAYMENT, RELEASE

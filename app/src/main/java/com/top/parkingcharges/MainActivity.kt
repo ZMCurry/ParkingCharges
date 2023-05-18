@@ -14,7 +14,6 @@ import android.view.Window
 import android.view.WindowManager
 import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
-import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.lifecycle.lifecycleScope
 import androidx.navigation.NavController
@@ -25,12 +24,26 @@ import com.azhon.appupdate.manager.DownloadManager
 import com.blankj.utilcode.util.AdaptScreenUtils
 import com.blankj.utilcode.util.AppUtils
 import com.blankj.utilcode.util.GsonUtils
+import com.blankj.utilcode.util.ImageUtils
+import com.blankj.utilcode.util.ToastUtils
+import com.cl.log.XLog
+import com.kongqw.serialportlibrary.Driver
+import com.kongqw.serialportlibrary.SerialUtils
+import com.kongqw.serialportlibrary.enumerate.SerialPortEnum
+import com.kongqw.serialportlibrary.enumerate.SerialStatus
+import com.kongqw.serialportlibrary.listener.SerialPortDirectorListens
 import com.top.parkingcharges.databinding.ActivityMainBinding
 import com.top.parkingcharges.entity.NettyResult
+import com.top.parkingcharges.entity.ParkingInfoEntity
+import com.top.parkingcharges.entity.PayContentEntity
+import com.top.parkingcharges.entity.PayInfoEntity
+import com.top.parkingcharges.entity.TextContentEntity
 import com.top.parkingcharges.fragment.HostDialogFragment
 import com.top.parkingcharges.netty.Netty
 import com.top.parkingcharges.netty.NettyUtil
 import com.top.parkingcharges.viewmodel.Event
+import com.top.parkingcharges.viewmodel.KEY_BAUD_RATE
+import com.top.parkingcharges.viewmodel.KEY_SERIAL_PORT
 import com.top.parkingcharges.viewmodel.MainViewModel
 import com.top.parkingcharges.viewmodel.Page
 import com.top.parkingcharges.viewmodel.dataStore
@@ -44,6 +57,7 @@ import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import java.io.File
+import java.math.BigInteger
 import java.util.*
 
 
@@ -83,17 +97,11 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
                     is Event.SendMsg -> {
                         sendNettyMsg(it.msg)
                     }
+
                     is Event.LoginEvent -> {
                         if (it.succeed) {
                             Toasty.success(baseContext, getString(R.string.login_success)).show()
                             startHeartBeatJob()
-                            //测试代码
-//                            lifecycleScope.launch {
-//                                delay(5000)
-//                                if (mNetty.isConnected) {
-//                                    sendNettyMsg("test")
-//                                }
-//                            }
                         }
                     }
                 }
@@ -102,26 +110,31 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
 
         lifecycleScope.launch {
             viewModel.newestHost.collectLatest {
-                mNetty.disconnect()
+                SerialUtils.getInstance().serialPortClose()
                 delay(300)
-                mNetty.connect(it.host, it.port)
+                SerialUtils.getInstance()
+                    .manyOpenSerialPort(listOf(Driver(it.serialPort, it.baudRate)))
             }
         }
 
         lifecycleScope.launchWhenCreated {
             val firstOrNull = baseContext.dataStore.data.map { preferences ->
-                val host = preferences[stringPreferencesKey("host")]
-                val port = preferences[intPreferencesKey("port")]
-                if (!host.isNullOrEmpty() && port != null) {
-                    Pair(host, port)
+                val serialPort = preferences[stringPreferencesKey(KEY_SERIAL_PORT)]
+                val baudRate = preferences[stringPreferencesKey(KEY_BAUD_RATE)]
+                if (!serialPort.isNullOrEmpty() && !baudRate.isNullOrEmpty()) {
+                    Pair(serialPort, baudRate)
                 } else {
                     null
                 }
             }.firstOrNull()
             if (firstOrNull != null) {
-                mNetty.connect(firstOrNull.first, firstOrNull.second)
+                SerialUtils.getInstance().serialPortClose()
+                delay(300)
+                SerialUtils.getInstance()
+                    .manyOpenSerialPort(listOf(Driver(firstOrNull.first, firstOrNull.second)))
             }
         }
+
         val navOptions: NavOptions = NavOptions.Builder()
             .setEnterAnim(R.anim.slide_in_right) //进入动画
             .setExitAnim(R.anim.slide_out_left) //退出动画
@@ -136,9 +149,11 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
                     Page.IDLE -> {
                         navController.navigate(R.id.idleStateFragment, args = null, navOptions)
                     }
+
                     Page.PAYMENT -> {
                         navController.navigate(R.id.paymentStateFragment, args = null, navOptions)
                     }
+
                     Page.RELEASE -> {
                         navController.navigate(R.id.releaseStateFragment, args = null, navOptions)
                     }
@@ -193,11 +208,249 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             }
         }
 
-        lifecycleScope.launch {
-            delay(3000)
-            speak()
+
+        val calcCrc16 = CRC16Util.calcCrc16(
+            BigInteger(("0064FFFF0006313539373533").replace(" ",""),16).toByteArray()
+
+        )
+        Log.d(TAG, "calcCrc16: $calcCrc16")
+
+        SerialUtils.getInstance().setmSerialPortDirectorListens(object : SerialPortDirectorListens {
+            var partialData: Pair<ParkingMsgType, LinkedList<String>>? = null
+
+            /**
+             * 接收回调
+             * @param bytes 接收到的数据
+             * @param serialPortEnum  串口类型
+             */
+            override fun onDataReceived(bytes: ByteArray, serialPortEnum: SerialPortEnum) {
+                Log.i(TAG, "当前接收串口类型：" + serialPortEnum.name)
+                Log.i(TAG, "onDataReceived [ byte[] ]: " + bytes.contentToString())
+                Log.i(TAG, "onDataReceived [ String ]: " + String(bytes))
+
+                val list = LinkedList(bytes.joinToString(separator = ",") { eachByte ->
+                    "%02x".format(eachByte)
+                }.split(","))
+                if (partialData == null) {
+                    when (getType(list)) {
+                        ParkingMsgType.E_FIVE -> {
+                            try {
+                                parseHexList(list)
+//                                try {
+//                                    SerialUtils.getInstance().sendData(serialPortEnum, )
+//                                }
+                            } catch (e: Exception) {
+                                partialData = Pair(ParkingMsgType.E_FIVE, list)
+                            }
+                        }
+
+                        ParkingMsgType.SIX_E -> {
+                            try {
+                                parsePayList(list)
+                            } catch (e: Exception) {
+                                partialData = Pair(ParkingMsgType.SIX_E, list)
+                            }
+                        }
+
+                        ParkingMsgType.UNKNOWN -> {
+                            //do nothing
+                        }
+                    }
+                } else {
+                    partialData?.second?.addAll(list)
+                    when (partialData?.first) {
+                        ParkingMsgType.E_FIVE -> {
+                            try {
+                                parseHexList(list)
+                            } catch (_: Exception) {
+                            }
+                        }
+
+                        ParkingMsgType.SIX_E -> {
+                            try {
+                                parsePayList(list)
+                            } catch (_: Exception) {
+                            }
+                        }
+
+                        else -> {}
+                    }
+                }
+
+            }
+
+            /**
+             * 发送回调
+             * @param bytes 发送的数据
+             * @param serialPortEnum  串口类型
+             */
+            override fun onDataSent(bytes: ByteArray, serialPortEnum: SerialPortEnum) {
+                Log.i(TAG, "当前发送串口类型：" + serialPortEnum.name)
+                Log.i(TAG, "onDataSent [ byte[] ]: " + bytes.contentToString())
+                Log.i(TAG, "onDataSent [ String ]: " + String(bytes))
+
+
+            }
+
+            /**
+             * 串口打开回调
+             * @param serialPortEnum  串口类型
+             * @param device  串口号
+             * @param status 打开状态
+             */
+            override fun openState(
+                serialPortEnum: SerialPortEnum,
+                device: File,
+                status: SerialStatus
+            ) {
+                XLog.i("串口打开状态：" + device.name + "---打开状态：" + status.name)
+                when (serialPortEnum) {
+                    SerialPortEnum.SERIAL_ONE -> when (status) {
+                        SerialStatus.SUCCESS_OPENED -> ToastUtils.showShort("串口打开成功")
+                        SerialStatus.NO_READ_WRITE_PERMISSION -> ToastUtils.showShort("没有读写权限")
+                        SerialStatus.OPEN_FAIL -> ToastUtils.showShort("串口打开失败")
+                    }
+
+                    SerialPortEnum.SERIAL_TWO -> XLog.i("根据实际多串口场景演示")
+                    else -> {}
+                }
+            }
+        })
+
+
+//        parseHexList(hexList = hexArray)
+
+        parsePayList(hexList = payArray)
+    }
+
+    private fun getType(hexList: LinkedList<String>): ParkingMsgType {
+        val orNull = hexList.getOrNull(4)
+        return if ("e5".equals(orNull, true)) {
+            ParkingMsgType.E_FIVE
+        } else if ("6E".equals(orNull, true)) {
+            ParkingMsgType.SIX_E
+        } else {
+            ParkingMsgType.UNKNOWN
         }
     }
+
+    private fun parseHexList(hexList: LinkedList<String>) {
+        val da = hexList.pop()
+        val vr = hexList.pop().toInt(16)
+        val pn = hexList.pop() + hexList.pop()
+        val cmd = hexList.pop()
+        val dl =
+            if (vr == 100) hexList.pop().toInt(16) else (hexList.pop() + hexList.pop()).toInt(16)
+        val saveFlag = hexList.pop().toInt(16)
+        val textContentNum = hexList.pop().toInt(16)
+        val textContentList = mutableListOf<TextContentEntity>()
+        repeat(textContentNum) {
+            val lid = hexList.pop()
+            val dm = hexList.pop()
+            val ds = hexList.pop()
+            val dt = hexList.pop().toInt(16)
+            val dr = hexList.pop().toInt(16)
+            val tc = hexList.pop() + hexList.pop() + hexList.pop() + hexList.pop()
+            val textLength = hexList.pop().toInt(16)
+            val stringBuilder = StringBuilder()
+            repeat(textLength) {
+                stringBuilder.append(hexList.pop())
+            }
+            val textContentEntity = TextContentEntity(
+                lid = lid,
+                dm = dm,
+                ds = ds,
+                dt = dt,
+                dr = dr,
+                tc = tc,
+                textLength = textLength,
+                text = BigInteger(
+                    stringBuilder.toString(), 16
+                ).toByteArray().toString(charset("GB2312")),
+                endFlag = hexList.pop()
+            )
+            textContentList.add(textContentEntity)
+        }
+        val vf = hexList.pop()
+        val vtl = hexList.pop().toInt(16)
+        val voiceStringBuilder = StringBuilder()
+        repeat(vtl) {
+            voiceStringBuilder.append(hexList.pop())
+        }
+        val voiceContent =
+            BigInteger(voiceStringBuilder.toString().trim(), 16).toByteArray().toString(
+                charset("GB2312")
+            )
+        val voiceEndFlag = hexList.pop()
+        val crc = hexList.pop() + hexList.pop()
+        val parkingInfoEntity = ParkingInfoEntity(
+            da = da,
+            vr = vr,
+            pn = pn,
+            cmd = cmd,
+            dl = dl,
+            saveFlag = saveFlag,
+            textContentNumber = textContentNum,
+            textContentList = textContentList,
+            vf = vf,
+            vtl = vtl,
+            voiceContent = voiceContent,
+            voiceEndFlag = voiceEndFlag,
+            crc = crc
+        )
+        Log.d(TAG, "parseBytes: $parkingInfoEntity")
+    }
+
+
+    private fun parsePayList(hexList: LinkedList<String>) {
+        val da = hexList.pop()
+        val vr = hexList.pop().toInt(16)
+        val pn = hexList.pop() + hexList.pop()
+        val cmd = hexList.pop()
+        val dl =
+            if (vr == 100) hexList.pop().toInt(16) else (hexList.pop() + hexList.pop()).toInt(16)
+
+        val sf = hexList.pop()
+        val em = hexList.pop()
+        val etm = hexList.pop()
+        val st = hexList.pop().toInt(16)
+        val ni = hexList.pop()
+        val ven = hexList.pop()
+        val tl = hexList.pop().toInt(16)
+        val voiceStringBuilder = StringBuilder()
+        repeat(tl) {
+            voiceStringBuilder.append(hexList.pop())
+        }
+        val text =
+            BigInteger(voiceStringBuilder.toString(), 16).toByteArray().toString(
+                charset("GB2312")
+            ).trim()
+        val payContentEntity = PayContentEntity(
+            sf = sf,
+            em = em,
+            etm = etm,
+            st = st,
+            ni = ni,
+            ven = ven,
+            tl = tl,
+            text = text
+        )
+        val qrCode = hexList.dropLast(2).joinToString(separator = "")
+        val crc = hexList.drop(hexList.size - 2).joinToString(separator = "")
+        val payInfoEntity = PayInfoEntity(
+            da = da,
+            vr = vr,
+            pn = pn,
+            cmd = cmd,
+            dl = dl,
+            payContentEntity = payContentEntity,
+            qrCode = qrCode,
+            crc = crc
+        )
+        binding.qrCode.setImageBitmap(ImageUtils.getBitmap(BigInteger(qrCode, 16).toByteArray(), 0))
+        Log.d(TAG, "payEntity: $payInfoEntity")
+    }
+
 
     override fun getResources(): Resources {
         return AdaptScreenUtils.adaptWidth(super.getResources(), 1080)
@@ -374,9 +627,24 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         //切换背景的周期
         private const val DURATION_SLIDE = 10000L
 
+        private const val TAG: String = "MainActivityParking"
+
+        val hexArray =
+            LinkedList(
+                "00 64 FF FF 6E 6D 00 04 00 15 01 19 00 FF 00 00 00 08 D2 BB C2 B7 CB B3 B7 E7 0D 01 15 01 19 00 00 FF 00 00 09 BB A6 41 41 50 36 33 37 35 0D 02 15 01 19 00 FF 00 00 00 06 C1 D9 CA B1 B3 B5 0D 03 15 01 19 00 FF 00 00 00 08 D0 BB D0 BB BB DD B9 CB 00 0A 1D BB A6 41 41 50 36 33 37 35 2C C1 D9 CA B1 B3 B5 2C D7 A3 C4 FA D2 BB C2 B7 CB B3 B7 E7 00 5C F3".split(
+                    " "
+                )
+            )
+
+        val payArray = LinkedList(
+            "00 C8 FF FF E5 2F 01 01 00 01 78 00 81 76 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 BB A6 42 39 39 31 48 35 2C CD A3 B3 B5 30 D0 A1 CA B1 34 35 B7 D6 D6 D3 31 38 C3 EB 2C C7 EB BD C9 B7 D1 35 D4 AA 42 4D B2 00 00 00 00 00 00 00 3E 00 00 00 28 00 00 00 1D 00 00 00 E3 FF FF FF 01 00 01 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 FF FF FF 00 00 00 00 00 FE C7 7B F8 82 9D 42 08 BA BA 8A E8 BA AF C2 E8 BA 94 32 E8 82 54 92 08 FE AA AB F8 00 B3 08 00 56 E2 CE F8 F0 FB 5D 18 2E 95 FD 38 70 38 38 38 4B A5 A5 A8 10 88 AA 80 8E CB E4 50 45 AA 3B A0 6B 7B 35 70 50 EA E8 A8 0E 54 C2 60 B9 5D CB 48 A7 57 4F D0 00 D7 68 A0 FE 77 6A A0 82 A4 E8 A0 BA 67 7F B8 BA 9A 86 78 BA 0A EE E8 82 91 1C F0 FE 44 4D C0 AE 9C".split(
+                " "
+            )
+        )
+
     }
 
-    private fun speak() {
+    private fun speak(text: String) {
         val utteranceId = System.currentTimeMillis()
         val ttsOptions = HashMap<String, String>()
         ttsOptions[TextToSpeech.Engine.KEY_PARAM_UTTERANCE_ID] =
@@ -384,7 +652,8 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         ttsOptions[TextToSpeech.Engine.KEY_PARAM_VOLUME] = 1.toString() //音量
         ttsOptions[TextToSpeech.Engine.KEY_PARAM_STREAM] =
             AudioManager.STREAM_NOTIFICATION.toString() //播放类型
-        val ret = mSpeech.speak("停车时间5小时3分钟，请交费25元", TextToSpeech.QUEUE_FLUSH, ttsOptions)
+        val ret =
+            mSpeech.speak(text, TextToSpeech.QUEUE_FLUSH, ttsOptions)
         if (ret == TextToSpeech.SUCCESS) {
             //播报成功
         }
@@ -407,4 +676,8 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             //初始化TextToSpeech引擎失败
         }
     }
+}
+
+enum class ParkingMsgType {
+    E_FIVE, SIX_E, UNKNOWN
 }

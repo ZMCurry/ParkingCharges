@@ -1,13 +1,12 @@
 package com.top.parkingcharges
 
 import android.app.Application
-import android.view.Gravity
-import es.dmoral.toasty.Toasty
+import com.kongqw.serialportlibrary.SerialUtils
 
 class App : Application() {
     override fun onCreate() {
         super.onCreate()
-
+        SerialUtils.getInstance().init(this, true, "TAG");
 //        Toasty.Config.getInstance()
 //            .setGravity(Gravity.CENTER) // optional (set toast gravity, offsets are optional)
 //            .apply(); // required
