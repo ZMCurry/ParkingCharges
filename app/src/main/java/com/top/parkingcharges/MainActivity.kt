@@ -208,13 +208,6 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             }
         }
 
-
-        val calcCrc16 = CRC16Util.calcCrc16(
-            BigInteger(("0064FFFF0006313539373533").replace(" ",""),16).toByteArray()
-
-        )
-        Log.d(TAG, "calcCrc16: $calcCrc16")
-
         SerialUtils.getInstance().setmSerialPortDirectorListens(object : SerialPortDirectorListens {
             var partialData: Pair<ParkingMsgType, LinkedList<String>>? = null
 
@@ -236,9 +229,6 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
                         ParkingMsgType.E_FIVE -> {
                             try {
                                 parseHexList(list)
-//                                try {
-//                                    SerialUtils.getInstance().sendData(serialPortEnum, )
-//                                }
                             } catch (e: Exception) {
                                 partialData = Pair(ParkingMsgType.E_FIVE, list)
                             }
@@ -320,7 +310,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
 
 //        parseHexList(hexList = hexArray)
 
-        parsePayList(hexList = payArray)
+//        parsePayList(hexList = payArray)
     }
 
     private fun getType(hexList: LinkedList<String>): ParkingMsgType {
@@ -398,6 +388,14 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             voiceEndFlag = voiceEndFlag,
             crc = crc
         )
+        try {
+            SerialUtils.getInstance().sendData(
+                SerialPortEnum.SERIAL_ONE,
+                BigInteger("00 C8 FF FF E5 01 00 00 6F 10", 16).toByteArray()
+            )
+            speak(voiceContent)
+        } catch (_: Exception) {
+        }
         Log.d(TAG, "parseBytes: $parkingInfoEntity")
     }
 
@@ -448,6 +446,16 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             crc = crc
         )
         binding.qrCode.setImageBitmap(ImageUtils.getBitmap(BigInteger(qrCode, 16).toByteArray(), 0))
+        try {
+            SerialUtils.getInstance().sendData(
+                SerialPortEnum.SERIAL_ONE,
+                BigInteger("00 64 FF FF 6E 01 00 57 69", 16).toByteArray()
+            )
+            if (payContentEntity.ven == "81") {
+                speak(payContentEntity.text)
+            }
+        } catch (_: Exception) {
+        }
         Log.d(TAG, "payEntity: $payInfoEntity")
     }
 
