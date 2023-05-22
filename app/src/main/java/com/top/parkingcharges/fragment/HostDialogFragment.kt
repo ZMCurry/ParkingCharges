@@ -1,19 +1,41 @@
 package com.top.parkingcharges.fragment
 
+import android.graphics.Color
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.view.ViewGroup.LayoutParams
+import android.widget.TextView
 import androidx.fragment.app.DialogFragment
 import androidx.fragment.app.activityViewModels
-import com.blankj.utilcode.util.AdaptScreenUtils
+import androidx.lifecycle.lifecycleScope
+import androidx.recyclerview.widget.DiffUtil
+import androidx.recyclerview.widget.LinearLayoutManager
+import androidx.recyclerview.widget.ListAdapter
+import androidx.recyclerview.widget.RecyclerView
+import com.blankj.utilcode.util.ToastUtils
+import com.cl.log.XLog
 import com.google.android.material.textfield.TextInputLayout
+import com.kongqw.serialportlibrary.Device
+import com.kongqw.serialportlibrary.Driver
+import com.kongqw.serialportlibrary.SerialPortFinder
+import com.kongqw.serialportlibrary.SerialUtils
+import com.kongqw.serialportlibrary.enumerate.SerialPortEnum
+import com.kongqw.serialportlibrary.enumerate.SerialStatus
+import com.kongqw.serialportlibrary.listener.SerialPortDirectorListens
 import com.top.parkingcharges.databinding.DialogFragmentHostBinding
 import com.top.parkingcharges.viewmodel.HostPort
 import com.top.parkingcharges.viewmodel.MainViewModel
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import java.io.File
 
 
-class HostDialogFragment : DialogFragment() {
+class HostDialogFragment() : DialogFragment() {
+    private val serialHostAdapter by lazy {
+        SerialHostAdapter()
+    }
     private lateinit var binding: DialogFragmentHostBinding
     private val viewModel by activityViewModels<MainViewModel>()
     override fun onCreateView(
@@ -28,7 +50,7 @@ class HostDialogFragment : DialogFragment() {
     override fun onStart() {
         super.onStart()
         dialog?.window?.apply {
-            setLayout(AdaptScreenUtils.pt2Px(400f), AdaptScreenUtils.pt2Px(370f))
+            setLayout(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT)
         }
         dialog?.apply {
             setCancelable(true)
@@ -38,21 +60,50 @@ class HostDialogFragment : DialogFragment() {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
+
+        binding.rvSerialHost.apply {
+            layoutManager = LinearLayoutManager(requireContext())
+            adapter = serialHostAdapter
+        }
+
+
+        val serialPortFinder = SerialPortFinder()
+        val devices = serialPortFinder.devices
+
+//        val devices = listOf(
+//            Device("1", "2", File("")),
+//            Device("2", "2", File("")),
+//            Device("3", "2", File(""))
+//        )
+        serialHostAdapter.submitList(devices)
+
         binding.btOk.setOnClickListener {
-            if (validateHost() && validatePort()) {
-                viewModel.updateHost(
-                    HostPort(
-                        binding.etHost.text!!.trim().toString(),
-                        binding.etPort.text!!.trim().toString()
+            lifecycleScope.launch {
+                if (validateHost() && validatePort()) {
+                    viewModel.updateHost(
+                        HostPort(
+                            devices[serialHostAdapter.selectPosition!!].name,
+                            binding.etPort.text!!.trim().toString()
+                        )
                     )
-                )
-                dismissAllowingStateLoss()
+                    SerialUtils.getInstance().serialPortClose()
+                    delay(300)
+                    SerialUtils.getInstance().manyOpenSerialPort(
+                        listOf(
+                            Driver(
+                                devices[serialHostAdapter.selectPosition!!].name,
+                                binding.etPort.text!!.trim().toString()
+                            )
+                        )
+                    )
+                }
             }
         }
 
         binding.btCancel.setOnClickListener {
             dismissAllowingStateLoss()
         }
+
     }
 
     /**
@@ -68,8 +119,8 @@ class HostDialogFragment : DialogFragment() {
     }
 
     private fun validateHost(): Boolean {
-        if (binding.etHost.text?.trim().isNullOrBlank()) {
-            showError(binding.tilHost, "串口设备不能为空")
+        if (serialHostAdapter.selectPosition == null) {
+            ToastUtils.showLong("串口设备不能为空")
             return false
         }
         return true
@@ -81,5 +132,44 @@ class HostDialogFragment : DialogFragment() {
             return false
         }
         return true
+    }
+}
+
+class SerialHostAdapter : ListAdapter<Device, SerialHostAdapter.SerialHostViewHolder>(object :
+    DiffUtil.ItemCallback<Device>() {
+    override fun areItemsTheSame(oldItem: Device, newItem: Device): Boolean {
+        return oldItem.name == newItem.name
+    }
+
+    override fun areContentsTheSame(oldItem: Device, newItem: Device): Boolean {
+        return oldItem.name == newItem.name && oldItem.root == newItem.root && oldItem.file == newItem.file
+    }
+}) {
+    var selectPosition: Int? = null
+
+    class SerialHostViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView)
+
+    override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): SerialHostViewHolder {
+        val textView = TextView(parent.context).apply {
+            val layoutParams = LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT)
+            setLayoutParams(layoutParams)
+            setTextColor(Color.BLACK)
+            textSize = 50f
+        }
+        return SerialHostViewHolder(textView)
+    }
+
+    override fun onBindViewHolder(holder: SerialHostViewHolder, position: Int) {
+        (holder.itemView as TextView).text = getItem(position).name
+        if (selectPosition == holder.adapterPosition) {
+            holder.itemView.setBackgroundColor(Color.YELLOW)
+        } else {
+            holder.itemView.setBackgroundColor(Color.WHITE)
+        }
+
+        holder.itemView.setOnClickListener {
+            selectPosition = holder.adapterPosition
+            notifyDataSetChanged()
+        }
     }
 }

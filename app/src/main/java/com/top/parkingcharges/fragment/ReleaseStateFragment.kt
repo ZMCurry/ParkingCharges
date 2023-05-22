@@ -8,10 +8,10 @@ import androidx.fragment.app.Fragment
 import androidx.fragment.app.activityViewModels
 import androidx.lifecycle.flowWithLifecycle
 import androidx.lifecycle.lifecycleScope
-import androidx.navigation.fragment.findNavController
-import com.top.parkingcharges.R
 import com.top.parkingcharges.databinding.FragmentReleaseStateBinding
+import com.top.parkingcharges.viewmodel.Event
 import com.top.parkingcharges.viewmodel.MainViewModel
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
@@ -33,18 +33,27 @@ class ReleaseStateFragment : Fragment() {
         viewLifecycleOwner.lifecycleScope.launch {
             viewModel.viewState.flowWithLifecycle(lifecycle).collectLatest {
                 it.releaseInfo?.also { releaseInfo ->
-                    binding.tvMsg1.text = releaseInfo.msg1
-                    binding.tvMsg2.text = releaseInfo.msg2
-                    binding.tvPlateNum.text = releaseInfo.plateNo
-                    binding.tvPlateType.text = releaseInfo.plateType
+                    val textContentList = releaseInfo.textContentList
+                    binding.tvPlateType.text = buildString {
+                        textContentList.forEach {
+                            append(it.text)
+                            append("\n").append("\n")
+                        }
+                    }
+                    releaseInfo.textContentList.firstOrNull()?.apply {
+                        countdownJob(this.dt)
+                    } ?: countdownJob(5)
                 }
             }
         }
+    }
 
-        //放行信息显示5s后，回到空闲页
-        viewLifecycleOwner.lifecycleScope.launch {
-            delay(5000)
-            findNavController().navigate(R.id.idleStateFragment)
+    var job: Job? = null
+    private fun countdownJob(st: Int) {
+        job?.cancel()
+        job = viewLifecycleOwner.lifecycleScope.launch {
+            delay(st * 1000L)
+            viewModel.onEvent(Event.Idle)
         }
     }
 }

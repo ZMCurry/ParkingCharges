@@ -2,7 +2,7 @@
 <resources>
     <dimen name="top_area_margin_top">50pt</dimen>
     <dimen name="area_bottom_margin_bottom">120pt</dimen>
-    <dimen name="text_large">40pt</dimen>
-    <dimen name="qr_code_width">250pt</dimen>
-    <dimen name="qr_code_height">250pt</dimen>
+    <dimen name="text_large">80pt</dimen>
+    <dimen name="qr_code_width">400pt</dimen>
+    <dimen name="qr_code_height">400pt</dimen>
 </resources>

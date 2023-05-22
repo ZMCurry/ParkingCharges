@@ -17,6 +17,8 @@ import com.top.parkingcharges.App
 import com.top.parkingcharges.MainActivity
 import com.top.parkingcharges.MsgType
 import com.top.parkingcharges.entity.NettyResult
+import com.top.parkingcharges.entity.ParkingInfoEntity
+import com.top.parkingcharges.entity.PayInfoEntity
 import com.top.parkingcharges.entity.PaymentInfo
 import com.top.parkingcharges.entity.ReleaseInfo
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -69,44 +71,16 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }.firstOrNull()
     }
 
-    fun sendMessage(msg: String) {
-        viewModelScope.launch {
-            _event.emit(Event.SendMsg(msg))
-        }
-    }
-
     fun dispatch(action: Action) {
         viewModelScope.launch {
             val state = _viewState.value
             when (action) {
                 is Action.Payment -> {
-                    _event.emit(
-                        Event.SendMsg(
-                            GsonUtils.toJson(
-                                NettyResult(
-                                    msgType = MsgType.PaymentConfirm.msgType,
-                                    data = if (action.paymentInfo == null) MainActivity.Status.ERROR
-                                    else MainActivity.Status.OK
-                                )
-                            )
-                        )
-                    )
-                    emit(state.copy(page = Page.PAYMENT, paymentInfo = action.paymentInfo))
+                    emit(state.copy(paymentInfo = action.payInfoEntity))
                 }
 
                 is Action.Release -> {
-                    _event.emit(
-                        Event.SendMsg(
-                            GsonUtils.toJson(
-                                NettyResult(
-                                    msgType = MsgType.ReleaseConfirm.msgType,
-                                    data = if (action.releaseInfo == null) MainActivity.Status.ERROR
-                                    else MainActivity.Status.OK
-                                )
-                            )
-                        )
-                    )
-                    emit(state.copy(page = Page.RELEASE, releaseInfo = action.releaseInfo))
+                    emit(state.copy(releaseInfo = action.parkingInfoEntity))
                 }
             }
         }
@@ -116,49 +90,55 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         _viewState.value = viewState
     }
 
-    fun handleMsg(msg: String?) {
-        msg?.let { json ->
-            viewModelScope.launch {
-                try {
-                    val nettyResult = GsonUtils.fromJson(json, NettyResult::class.java)
-                    val data = nettyResult.data
-                    when (nettyResult.msgType) {
-                        MsgType.LoginReceive.msgType -> {
-                            _event.emit(
-                                Event.LoginEvent(
-                                    MainActivity.Status.OK.equals(
-                                        data,
-                                        true
-                                    )
-                                )
-                            )
-                        }
-
-                        MsgType.PaymentReceive.msgType -> {
-                            try {
-                                val paymentInfo = GsonUtils.fromJson(data, PaymentInfo::class.java)
-                                dispatch(Action.Payment(paymentInfo))
-                            } catch (e: JsonSyntaxException) {
-                                dispatch(Action.Payment(null))
-                            }
-                        }
-
-                        MsgType.ReleaseReceive.msgType -> {
-                            try {
-                                val releaseInfo =
-                                    GsonUtils.fromJson(data, ReleaseInfo::class.java)
-                                dispatch(Action.Release(releaseInfo))
-                            } catch (e: JsonSyntaxException) {
-                                dispatch(Action.Release(null))
-                            }
-                        }
-                    }
-                } catch (e: JsonSyntaxException) {
-
-                }
-            }
+    fun onEvent(event: Event) {
+        viewModelScope.launch {
+            _event.emit(event)
         }
     }
+
+//    fun handleMsg(msg: String?) {
+//        msg?.let { json ->
+//            viewModelScope.launch {
+//                try {
+//                    val nettyResult = GsonUtils.fromJson(json, NettyResult::class.java)
+//                    val data = nettyResult.data
+//                    when (nettyResult.msgType) {
+//                        MsgType.LoginReceive.msgType -> {
+//                            _event.emit(
+//                                Event.LoginEvent(
+//                                    MainActivity.Status.OK.equals(
+//                                        data,
+//                                        true
+//                                    )
+//                                )
+//                            )
+//                        }
+//
+//                        MsgType.PaymentReceive.msgType -> {
+//                            try {
+//                                val paymentInfo = GsonUtils.fromJson(data, PaymentInfo::class.java)
+//                                dispatch(Action.Payment(paymentInfo))
+//                            } catch (e: JsonSyntaxException) {
+//                                dispatch(Action.Payment(null))
+//                            }
+//                        }
+//
+//                        MsgType.ReleaseReceive.msgType -> {
+//                            try {
+//                                val releaseInfo =
+//                                    GsonUtils.fromJson(data, ReleaseInfo::class.java)
+//                                dispatch(Action.Release(releaseInfo))
+//                            } catch (e: JsonSyntaxException) {
+//                                dispatch(Action.Release(null))
+//                            }
+//                        }
+//                    }
+//                } catch (e: JsonSyntaxException) {
+//
+//                }
+//            }
+//        }
+//    }
 
     //这里的列表至少是两个元素，否则无法切换
     val backgroundColors = arrayListOf(
@@ -170,9 +150,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 }
 
 data class ViewState(
-    val page: Page = Page.IDLE,
-    val paymentInfo: PaymentInfo? = null,
-    val releaseInfo: ReleaseInfo? = null,
+    val paymentInfo: PayInfoEntity? = null,
+    val releaseInfo: ParkingInfoEntity? = null,
     val defaultQrCode: String = "haha"
 )
 
@@ -184,11 +163,12 @@ enum class Page {
 
 //事件，只触发一次，不随着生命周期重复触发
 sealed class Event {
-    data class SendMsg(val msg: String) : Event()
-    data class LoginEvent(val succeed: Boolean) : Event()
+    object Idle : Event()
+    object Payment : Event()
+    object Release : Event()
 }
 
 sealed class Action {
-    data class Payment(val paymentInfo: PaymentInfo?) : Action()
-    data class Release(val releaseInfo: ReleaseInfo?) : Action()
+    data class Payment(val payInfoEntity: PayInfoEntity) : Action()
+    data class Release(val parkingInfoEntity: ParkingInfoEntity) : Action()
 }

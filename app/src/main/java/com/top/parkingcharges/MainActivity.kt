@@ -23,8 +23,6 @@ import com.azhon.appupdate.listener.OnDownloadListener
 import com.azhon.appupdate.manager.DownloadManager
 import com.blankj.utilcode.util.AdaptScreenUtils
 import com.blankj.utilcode.util.AppUtils
-import com.blankj.utilcode.util.GsonUtils
-import com.blankj.utilcode.util.ImageUtils
 import com.blankj.utilcode.util.ToastUtils
 import com.cl.log.XLog
 import com.kongqw.serialportlibrary.Driver
@@ -33,26 +31,20 @@ import com.kongqw.serialportlibrary.enumerate.SerialPortEnum
 import com.kongqw.serialportlibrary.enumerate.SerialStatus
 import com.kongqw.serialportlibrary.listener.SerialPortDirectorListens
 import com.top.parkingcharges.databinding.ActivityMainBinding
-import com.top.parkingcharges.entity.NettyResult
 import com.top.parkingcharges.entity.ParkingInfoEntity
 import com.top.parkingcharges.entity.PayContentEntity
 import com.top.parkingcharges.entity.PayInfoEntity
 import com.top.parkingcharges.entity.TextContentEntity
 import com.top.parkingcharges.fragment.HostDialogFragment
-import com.top.parkingcharges.netty.Netty
-import com.top.parkingcharges.netty.NettyUtil
+import com.top.parkingcharges.viewmodel.Action
 import com.top.parkingcharges.viewmodel.Event
 import com.top.parkingcharges.viewmodel.KEY_BAUD_RATE
 import com.top.parkingcharges.viewmodel.KEY_SERIAL_PORT
 import com.top.parkingcharges.viewmodel.MainViewModel
-import com.top.parkingcharges.viewmodel.Page
 import com.top.parkingcharges.viewmodel.dataStore
 import es.dmoral.toasty.Toasty
-import io.netty.channel.ChannelHandlerContext
-import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
-import kotlinx.coroutines.flow.distinctUntilChangedBy
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
@@ -63,7 +55,20 @@ import java.util.*
 
 class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
 
-    private lateinit var mNetty: NettyUtil
+//    private lateinit var mNetty: NettyUtil
+
+    private val hexArray =
+        LinkedList(
+            "00 64 FF FF 6E 6D 00 04 00 15 01 19 00 FF 00 00 00 08 D2 BB C2 B7 CB B3 B7 E7 0D 01 15 01 19 00 00 FF 00 00 09 BB A6 41 41 50 36 33 37 35 0D 02 15 01 19 00 FF 00 00 00 06 C1 D9 CA B1 B3 B5 0D 03 15 01 19 00 FF 00 00 00 08 D0 BB D0 BB BB DD B9 CB 00 0A 1D BB A6 41 41 50 36 33 37 35 2C C1 D9 CA B1 B3 B5 2C D7 A3 C4 FA D2 BB C2 B7 CB B3 B7 E7 00 5C F3".split(
+                " "
+            )
+        )
+
+    private val payArray = LinkedList(
+        "00 C8 FF FF E5 2F 01 01 00 01 78 00 81 76 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 BB A6 42 39 39 31 48 35 2C CD A3 B3 B5 30 D0 A1 CA B1 34 35 B7 D6 D6 D3 31 38 C3 EB 2C C7 EB BD C9 B7 D1 35 D4 AA 42 4D B2 00 00 00 00 00 00 00 3E 00 00 00 28 00 00 00 1D 00 00 00 E3 FF FF FF 01 00 01 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 FF FF FF 00 00 00 00 00 FE C7 7B F8 82 9D 42 08 BA BA 8A E8 BA AF C2 E8 BA 94 32 E8 82 54 92 08 FE AA AB F8 00 B3 08 00 56 E2 CE F8 F0 FB 5D 18 2E 95 FD 38 70 38 38 38 4B A5 A5 A8 10 88 AA 80 8E CB E4 50 45 AA 3B A0 6B 7B 35 70 50 EA E8 A8 0E 54 C2 60 B9 5D CB 48 A7 57 4F D0 00 D7 68 A0 FE 77 6A A0 82 A4 E8 A0 BA 67 7F B8 BA 9A 86 78 BA 0A EE E8 82 91 1C F0 FE 44 4D C0 AE 9C".split(
+            " "
+        )
+    )
 
     private lateinit var binding: ActivityMainBinding
 
@@ -89,24 +94,24 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         navController =
             (supportFragmentManager.findFragmentById(R.id.fcv) as NavHostFragment).navController
 
-        initNetty()
+//        initNetty()
 
-        lifecycleScope.launchWhenStarted {
-            viewModel.event.collectLatest {
-                when (it) {
-                    is Event.SendMsg -> {
-                        sendNettyMsg(it.msg)
-                    }
-
-                    is Event.LoginEvent -> {
-                        if (it.succeed) {
-                            Toasty.success(baseContext, getString(R.string.login_success)).show()
-                            startHeartBeatJob()
-                        }
-                    }
-                }
-            }
-        }
+//        lifecycleScope.launchWhenStarted {
+//            viewModel.event.collectLatest {
+//                when (it) {
+//                    is Event.SendMsg -> {
+//                        sendNettyMsg(it.msg)
+//                    }
+//
+//                    is Event.LoginEvent -> {
+//                        if (it.succeed) {
+//                            Toasty.success(baseContext, getString(R.string.login_success)).show()
+//                            startHeartBeatJob()
+//                        }
+//                    }
+//                }
+//            }
+//        }
 
         lifecycleScope.launch {
             viewModel.newestHost.collectLatest {
@@ -142,19 +147,17 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             .setPopExitAnim(R.anim.slide_out_right) //弹出退出动画
             .build()
         lifecycleScope.launch {
-            viewModel.viewState.distinctUntilChangedBy {
-                it.page
-            }.collectLatest {
-                when (it.page) {
-                    Page.IDLE -> {
+            viewModel.event.collectLatest {
+                when (it) {
+                    Event.Idle -> {
                         navController.navigate(R.id.idleStateFragment, args = null, navOptions)
                     }
 
-                    Page.PAYMENT -> {
+                    Event.Payment -> {
                         navController.navigate(R.id.paymentStateFragment, args = null, navOptions)
                     }
 
-                    Page.RELEASE -> {
+                    Event.Release -> {
                         navController.navigate(R.id.releaseStateFragment, args = null, navOptions)
                     }
                 }
@@ -208,6 +211,15 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             }
         }
 
+
+//        lifecycleScope.launch {
+//            delay(10000)
+//            parsePayList(payArray)
+//            delay(10000L)
+//            parseHexList(hexArray)
+//        }
+
+
         SerialUtils.getInstance().setmSerialPortDirectorListens(object : SerialPortDirectorListens {
             var partialData: Pair<ParkingMsgType, LinkedList<String>>? = null
 
@@ -252,6 +264,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
                         ParkingMsgType.E_FIVE -> {
                             try {
                                 parseHexList(list)
+                                partialData = null
                             } catch (_: Exception) {
                             }
                         }
@@ -259,6 +272,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
                         ParkingMsgType.SIX_E -> {
                             try {
                                 parsePayList(list)
+                                partialData = null
                             } catch (_: Exception) {
                             }
                         }
@@ -278,8 +292,6 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
                 Log.i(TAG, "当前发送串口类型：" + serialPortEnum.name)
                 Log.i(TAG, "onDataSent [ byte[] ]: " + bytes.contentToString())
                 Log.i(TAG, "onDataSent [ String ]: " + String(bytes))
-
-
             }
 
             /**
@@ -294,28 +306,26 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
                 status: SerialStatus
             ) {
                 XLog.i("串口打开状态：" + device.name + "---打开状态：" + status.name)
-                when (serialPortEnum) {
-                    SerialPortEnum.SERIAL_ONE -> when (status) {
-                        SerialStatus.SUCCESS_OPENED -> ToastUtils.showShort("串口打开成功")
-                        SerialStatus.NO_READ_WRITE_PERMISSION -> ToastUtils.showShort("没有读写权限")
-                        SerialStatus.OPEN_FAIL -> ToastUtils.showShort("串口打开失败")
+                when (status) {
+                    SerialStatus.SUCCESS_OPENED -> ToastUtils.showShort("串口打开成功")
+                    SerialStatus.NO_READ_WRITE_PERMISSION -> ToastUtils.showShort("没有读写权限")
+                    SerialStatus.OPEN_FAIL -> ToastUtils.showShort("串口打开失败")
+                }
+                if (status == SerialStatus.SUCCESS_OPENED) {
+                    val findFragmentByTag =
+                        supportFragmentManager.findFragmentByTag(HostDialogFragment::class.java.simpleName)
+                    if (findFragmentByTag != null && findFragmentByTag is HostDialogFragment) {
+                        findFragmentByTag.dismissAllowingStateLoss()
                     }
-
-                    SerialPortEnum.SERIAL_TWO -> XLog.i("根据实际多串口场景演示")
-                    else -> {}
                 }
             }
         })
 
-
-//        parseHexList(hexList = hexArray)
-
-//        parsePayList(hexList = payArray)
     }
 
     private fun getType(hexList: LinkedList<String>): ParkingMsgType {
         val orNull = hexList.getOrNull(4)
-        return if ("e5".equals(orNull, true)) {
+        return if ("E5".equals(orNull, true)) {
             ParkingMsgType.E_FIVE
         } else if ("6E".equals(orNull, true)) {
             ParkingMsgType.SIX_E
@@ -396,6 +406,8 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             speak(voiceContent)
         } catch (_: Exception) {
         }
+        viewModel.dispatch(action = Action.Release(parkingInfoEntity))
+        viewModel.onEvent(event = Event.Release)
         Log.d(TAG, "parseBytes: $parkingInfoEntity")
     }
 
@@ -445,7 +457,6 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             qrCode = qrCode,
             crc = crc
         )
-        binding.qrCode.setImageBitmap(ImageUtils.getBitmap(BigInteger(qrCode, 16).toByteArray(), 0))
         try {
             SerialUtils.getInstance().sendData(
                 SerialPortEnum.SERIAL_ONE,
@@ -456,6 +467,8 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             }
         } catch (_: Exception) {
         }
+        viewModel.dispatch(action = Action.Payment(payInfoEntity))
+        viewModel.onEvent(Event.Payment)
         Log.d(TAG, "payEntity: $payInfoEntity")
     }
 
@@ -522,102 +535,102 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
     //用于连续点击判断
     private var mHits = LongArray(COUNT)
 
-    private fun initNetty() {
-        mNetty = NettyUtil(object : Netty.OnChannelHandler {
-            override fun onMessageReceived(ctx: ChannelHandlerContext, msg: String?) {
-                Log.d("-----", "onMessageReceived: $msg")
-                viewModel.handleMsg(msg)
-            }
+//    private fun initNetty() {
+//        mNetty = NettyUtil(object : Netty.OnChannelHandler {
+//            override fun onMessageReceived(ctx: ChannelHandlerContext, msg: String?) {
+//                Log.d("-----", "onMessageReceived: $msg")
+//                viewModel.handleMsg(msg)
+//            }
+//
+//            override fun onExceptionCaught(ctx: ChannelHandlerContext, e: Throwable) {
+//
+//            }
+//
+//        }, true)
+//        mNetty.setOnConnectListener(object : Netty.OnConnectListener {
+//            override fun onSuccess() {
+//                Log.d("-----", "onSuccess: ")
+//                sendLoginMsg()
+//            }
+//
+//            override fun onFailed() {
+//                Log.d("-----", "onFailed: ")
+//            }
+//
+//            override fun onError(e: Exception) {
+//                e.message?.apply {
+//                    Toasty.error(baseContext, this).show()
+//                }
+//                Log.d("-----", "onError:${e.message} ")
+//            }
+//
+//        })
+//        mNetty.setOnSendMessageListener(object : Netty.OnSendMessageListener {
+//            override fun onSendMessage(msg: String, success: Boolean) {
+//                Log.d("-----", "onSendMessage:  我发送的消息 $msg")
+//            }
+//
+//            override fun onException(e: Throwable?) {
+//
+//            }
+//
+//        })
+//
+//    }
+//
+//    private fun sendLoginMsg() {
+//        lifecycleScope.launch {
+//            sendNettyMsg(
+//                GsonUtils.toJson(
+//                    NettyResult(
+//                        msgType = MsgType.LoginSend.msgType,
+//                        data = viewModel.getUUID() ?: ""
+//                    )
+//                )
+//            )
+//        }
+//    }
 
-            override fun onExceptionCaught(ctx: ChannelHandlerContext, e: Throwable) {
-
-            }
-
-        }, true)
-        mNetty.setOnConnectListener(object : Netty.OnConnectListener {
-            override fun onSuccess() {
-                Log.d("-----", "onSuccess: ")
-                sendLoginMsg()
-            }
-
-            override fun onFailed() {
-                Log.d("-----", "onFailed: ")
-            }
-
-            override fun onError(e: Exception) {
-                e.message?.apply {
-                    Toasty.error(baseContext, this).show()
-                }
-                Log.d("-----", "onError:${e.message} ")
-            }
-
-        })
-        mNetty.setOnSendMessageListener(object : Netty.OnSendMessageListener {
-            override fun onSendMessage(msg: String, success: Boolean) {
-                Log.d("-----", "onSendMessage:  我发送的消息 $msg")
-            }
-
-            override fun onException(e: Throwable?) {
-
-            }
-
-        })
-
-    }
-
-    private fun sendLoginMsg() {
-        lifecycleScope.launch {
-            sendNettyMsg(
-                GsonUtils.toJson(
-                    NettyResult(
-                        msgType = MsgType.LoginSend.msgType,
-                        data = viewModel.getUUID() ?: ""
-                    )
-                )
-            )
-        }
-    }
-
-    private fun sendHeartBeat() {
-        sendNettyMsg(
-            GsonUtils.toJson(
-                NettyResult(
-                    msgType = MsgType.HeartBeatSend.msgType,
-                    data = "ping"
-                )
-            )
-        )
-    }
-
-    private var heartBeatJob: Job? = null
+//    private fun sendHeartBeat() {
+//        sendNettyMsg(
+//            GsonUtils.toJson(
+//                NettyResult(
+//                    msgType = MsgType.HeartBeatSend.msgType,
+//                    data = "ping"
+//                )
+//            )
+//        )
+//    }
+//
+//    private var heartBeatJob: Job? = null
 
     /**
      * 每15s 发送一次心跳
      */
-    private fun startHeartBeatJob() {
-        heartBeatJob?.cancel()
-        heartBeatJob = lifecycleScope.launchWhenResumed {
-            while (true) {
-                if (mNetty.isConnected) {
-                    sendHeartBeat()
-                }
-                delay(150000)
-            }
-        }
-    }
+//    private fun startHeartBeatJob() {
+//        heartBeatJob?.cancel()
+//        heartBeatJob = lifecycleScope.launchWhenResumed {
+//            while (true) {
+//                if (mNetty.isConnected) {
+//                    sendHeartBeat()
+//                }
+//                delay(150000)
+//            }
+//        }
+//    }
 
-    private fun sendNettyMsg(msg: String) {
-        if (mNetty.isConnected) {
-            mNetty.sendMessage(msg)
-        } else {
-            Log.d("-----", "sendNettyMsg: Netty未连接到服务器 ")
-//            Toasty.error(baseContext, "Netty未连接到服务器").show()
-        }
-    }
+//    private fun sendNettyMsg(msg: String) {
+//        if (mNetty.isConnected) {
+//            mNetty.sendMessage(msg)
+//        } else {
+//            Log.d("-----", "sendNettyMsg: Netty未连接到服务器 ")
+////            Toasty.error(baseContext, "Netty未连接到服务器").show()
+//        }
+//    }
 
     override fun onDestroy() {
         super.onDestroy()
-        mNetty.disconnect()
+//        mNetty.disconnect()
     }
 
     object Status {
@@ -637,18 +650,6 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
 
         private const val TAG: String = "MainActivityParking"
 
-        val hexArray =
-            LinkedList(
-                "00 64 FF FF 6E 6D 00 04 00 15 01 19 00 FF 00 00 00 08 D2 BB C2 B7 CB B3 B7 E7 0D 01 15 01 19 00 00 FF 00 00 09 BB A6 41 41 50 36 33 37 35 0D 02 15 01 19 00 FF 00 00 00 06 C1 D9 CA B1 B3 B5 0D 03 15 01 19 00 FF 00 00 00 08 D0 BB D0 BB BB DD B9 CB 00 0A 1D BB A6 41 41 50 36 33 37 35 2C C1 D9 CA B1 B3 B5 2C D7 A3 C4 FA D2 BB C2 B7 CB B3 B7 E7 00 5C F3".split(
-                    " "
-                )
-            )
-
-        val payArray = LinkedList(
-            "00 C8 FF FF E5 2F 01 01 00 01 78 00 81 76 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 BB A6 42 39 39 31 48 35 2C CD A3 B3 B5 30 D0 A1 CA B1 34 35 B7 D6 D6 D3 31 38 C3 EB 2C C7 EB BD C9 B7 D1 35 D4 AA 42 4D B2 00 00 00 00 00 00 00 3E 00 00 00 28 00 00 00 1D 00 00 00 E3 FF FF FF 01 00 01 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 FF FF FF 00 00 00 00 00 FE C7 7B F8 82 9D 42 08 BA BA 8A E8 BA AF C2 E8 BA 94 32 E8 82 54 92 08 FE AA AB F8 00 B3 08 00 56 E2 CE F8 F0 FB 5D 18 2E 95 FD 38 70 38 38 38 4B A5 A5 A8 10 88 AA 80 8E CB E4 50 45 AA 3B A0 6B 7B 35 70 50 EA E8 A8 0E 54 C2 60 B9 5D CB 48 A7 57 4F D0 00 D7 68 A0 FE 77 6A A0 82 A4 E8 A0 BA 67 7F B8 BA 9A 86 78 BA 0A EE E8 82 91 1C F0 FE 44 4D C0 AE 9C".split(
-                " "
-            )
-        )
 
     }
 

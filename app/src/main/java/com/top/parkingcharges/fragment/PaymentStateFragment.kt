@@ -8,15 +8,19 @@ import androidx.fragment.app.Fragment
 import androidx.fragment.app.activityViewModels
 import androidx.lifecycle.flowWithLifecycle
 import androidx.lifecycle.lifecycleScope
-import com.king.zxing.util.CodeUtils
+import androidx.navigation.fragment.findNavController
+import com.blankj.utilcode.util.ImageUtils
 import com.top.parkingcharges.R
 import com.top.parkingcharges.databinding.FragmentPaymentStateBinding
+import com.top.parkingcharges.viewmodel.Event
 import com.top.parkingcharges.viewmodel.MainViewModel
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.math.BigInteger
 
 class PaymentStateFragment : Fragment() {
     private lateinit var binding: FragmentPaymentStateBinding
@@ -36,24 +40,33 @@ class PaymentStateFragment : Fragment() {
         viewLifecycleOwner.lifecycleScope.launch {
             viewModel.viewState.flowWithLifecycle(lifecycle).collectLatest {
                 it.paymentInfo?.also { paymentInfo ->
-                    //plateNo为空时，使用默认二维码
                     val bitmap = withContext(Dispatchers.IO) {
-                        CodeUtils.createQRCode(
-                            if (paymentInfo.plateNo == null) it.defaultQrCode else paymentInfo.qrCode,
-                            resources.getDimensionPixelSize(R.dimen.qr_code_height)
-                        )
+                        ImageUtils.getBitmap(BigInteger(paymentInfo.qrCode, 16).toByteArray(), 0)
                     }
                     binding.ivQrCode.setImageBitmap(bitmap)
-                    binding.tvPlateNum.text = paymentInfo.plateNo
-                    binding.tvPlateType.text = paymentInfo.plateType
+                    val stringList = paymentInfo.payContentEntity.text.split(",")
+                    binding.tvPlateType.text = buildString {
+                        stringList.forEach {
+                            append(it)
+                            append("\n").append("\n")
+                        }
+                    }
+                    val st = it.paymentInfo.payContentEntity.st
+                    if (st != 0) {
+                        countdownJob(st)
+                    }
+//                    binding.tvPlateType.text = paymentInfo.plateType
                 }
             }
         }
+    }
 
-        //测试代码
-//        viewLifecycleOwner.lifecycleScope.launch {
-//            delay(3000)
-//            viewModel.sendMessage("payOver")
-//        }
+    var job: Job? = null
+    private fun countdownJob(st: Int) {
+        job?.cancel()
+        job = viewLifecycleOwner.lifecycleScope.launch {
+            delay(st * 1000L)
+            viewModel.onEvent(Event.Idle)
+        }
     }
 }
