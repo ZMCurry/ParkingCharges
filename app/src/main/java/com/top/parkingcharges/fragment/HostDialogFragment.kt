@@ -68,7 +68,7 @@ class HostDialogFragment() : DialogFragment() {
 
 
         val serialPortFinder = SerialPortFinder()
-        val devices = serialPortFinder.devices
+        val devices = serialPortFinder.allDevicesPath.toList()
 
 //        val devices = listOf(
 //            Device("1", "2", File("")),
@@ -82,7 +82,7 @@ class HostDialogFragment() : DialogFragment() {
                 if (validateHost() && validatePort()) {
                     viewModel.updateHost(
                         HostPort(
-                            devices[serialHostAdapter.selectPosition!!].name,
+                            devices[serialHostAdapter.selectPosition!!],
                             binding.etPort.text!!.trim().toString()
                         )
                     )
@@ -91,7 +91,7 @@ class HostDialogFragment() : DialogFragment() {
                     SerialUtils.getInstance().manyOpenSerialPort(
                         listOf(
                             Driver(
-                                devices[serialHostAdapter.selectPosition!!].name,
+                                devices[serialHostAdapter.selectPosition!!],
                                 binding.etPort.text!!.trim().toString()
                             )
                         )
@@ -135,14 +135,14 @@ class HostDialogFragment() : DialogFragment() {
     }
 }
 
-class SerialHostAdapter : ListAdapter<Device, SerialHostAdapter.SerialHostViewHolder>(object :
-    DiffUtil.ItemCallback<Device>() {
-    override fun areItemsTheSame(oldItem: Device, newItem: Device): Boolean {
-        return oldItem.name == newItem.name
+class SerialHostAdapter : ListAdapter<String, SerialHostAdapter.SerialHostViewHolder>(object :
+    DiffUtil.ItemCallback<String>() {
+    override fun areItemsTheSame(oldItem: String, newItem: String): Boolean {
+        return oldItem == newItem
     }
 
-    override fun areContentsTheSame(oldItem: Device, newItem: Device): Boolean {
-        return oldItem.name == newItem.name && oldItem.root == newItem.root && oldItem.file == newItem.file
+    override fun areContentsTheSame(oldItem: String, newItem: String): Boolean {
+        return oldItem == newItem
     }
 }) {
     var selectPosition: Int? = null
@@ -160,7 +160,7 @@ class SerialHostAdapter : ListAdapter<Device, SerialHostAdapter.SerialHostViewHo
     }
 
     override fun onBindViewHolder(holder: SerialHostViewHolder, position: Int) {
-        (holder.itemView as TextView).text = getItem(position).name
+        (holder.itemView as TextView).text = getItem(position)
         if (selectPosition == holder.adapterPosition) {
             holder.itemView.setBackgroundColor(Color.YELLOW)
         } else {
