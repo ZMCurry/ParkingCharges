@@ -221,7 +221,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
 
 
         SerialUtils.getInstance().setmSerialPortDirectorListens(object : SerialPortDirectorListens {
-            var partialData: Pair<ParkingMsgType, LinkedList<String>>? = null
+            var partialData: Triple<ParkingMsgType, Int, LinkedList<String>>? = null
 
             /**
              * 接收回调
@@ -240,17 +240,35 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
                     when (getType(list)) {
                         ParkingMsgType.E_FIVE -> {
                             try {
-                                parseHexList(list)
+                                parseHexList(list, serialPortEnum)
                             } catch (e: Exception) {
-                                partialData = Pair(ParkingMsgType.E_FIVE, list)
+                                try {
+                                    val fiveHex = list.getOrNull(5)
+                                    val sixHex = list.getOrNull(6)
+                                    if (fiveHex != null && sixHex != null) {
+                                        val dataLength = (fiveHex + sixHex).toInt(16)
+                                        partialData =
+                                            Triple(ParkingMsgType.E_FIVE, dataLength + 9, list)
+                                    }
+                                } catch (_: Exception) {
+                                }
                             }
                         }
 
                         ParkingMsgType.SIX_E -> {
                             try {
-                                parsePayList(list)
+                                parsePayList(list, serialPortEnum)
                             } catch (e: Exception) {
-                                partialData = Pair(ParkingMsgType.SIX_E, list)
+                                try {
+                                    val fiveHex = list.getOrNull(5)
+                                    val sixHex = list.getOrNull(6)
+                                    if (fiveHex != null && sixHex != null) {
+                                        val dataLength = (fiveHex + sixHex).toInt(16)
+                                        partialData =
+                                            Triple(ParkingMsgType.SIX_E, dataLength + 9, list)
+                                    }
+                                } catch (_: Exception) {
+                                }
                             }
                         }
 
@@ -259,11 +277,15 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
                         }
                     }
                 } else {
-                    partialData?.second?.addAll(list)
+                    if (partialData!!.third.size + list.size > partialData!!.second) {
+                        partialData = null
+                        return
+                    }
+                    partialData?.third?.addAll(list)
                     when (partialData?.first) {
                         ParkingMsgType.E_FIVE -> {
                             try {
-                                parseHexList(list)
+                                parseHexList(list, serialPortEnum)
                                 partialData = null
                             } catch (_: Exception) {
                             }
@@ -271,7 +293,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
 
                         ParkingMsgType.SIX_E -> {
                             try {
-                                parsePayList(list)
+                                parsePayList(list, serialPortEnum)
                                 partialData = null
                             } catch (_: Exception) {
                             }
@@ -334,7 +356,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         }
     }
 
-    private fun parseHexList(hexList: LinkedList<String>) {
+    private fun parseHexList(hexList: LinkedList<String>, serialPort: SerialPortEnum) {
         val da = hexList.pop()
         val vr = hexList.pop().toInt(16)
         val pn = hexList.pop() + hexList.pop()
@@ -400,7 +422,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         )
         try {
             SerialUtils.getInstance().sendData(
-                SerialPortEnum.SERIAL_ONE,
+                serialPort,
                 BigInteger("00 C8 FF FF E5 01 00 00 6F 10", 16).toByteArray()
             )
             speak(voiceContent)
@@ -412,7 +434,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
     }
 
 
-    private fun parsePayList(hexList: LinkedList<String>) {
+    private fun parsePayList(hexList: LinkedList<String>, serialPort: SerialPortEnum) {
         val da = hexList.pop()
         val vr = hexList.pop().toInt(16)
         val pn = hexList.pop() + hexList.pop()
@@ -459,7 +481,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         )
         try {
             SerialUtils.getInstance().sendData(
-                SerialPortEnum.SERIAL_ONE,
+                serialPort,
                 BigInteger("00 64 FF FF 6E 01 00 57 69", 16).toByteArray()
             )
             if (payContentEntity.ven == "81") {
