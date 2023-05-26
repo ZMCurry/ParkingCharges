@@ -4,14 +4,17 @@ import android.animation.ArgbEvaluator
 import android.animation.ObjectAnimator
 import android.annotation.SuppressLint
 import android.content.res.Resources
+import android.graphics.Color
 import android.media.AudioManager
 import android.os.Bundle
 import android.os.SystemClock
 import android.speech.tts.TextToSpeech
 import android.util.Log
 import android.view.View
+import android.view.ViewGroup
 import android.view.Window
 import android.view.WindowManager
+import android.widget.TextView
 import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
 import androidx.datastore.preferences.core.stringPreferencesKey
@@ -19,6 +22,10 @@ import androidx.lifecycle.lifecycleScope
 import androidx.navigation.NavController
 import androidx.navigation.NavOptions
 import androidx.navigation.fragment.NavHostFragment
+import androidx.recyclerview.widget.DiffUtil
+import androidx.recyclerview.widget.LinearLayoutManager
+import androidx.recyclerview.widget.ListAdapter
+import androidx.recyclerview.widget.RecyclerView
 import com.azhon.appupdate.listener.OnDownloadListener
 import com.azhon.appupdate.manager.DownloadManager
 import com.blankj.utilcode.util.AdaptScreenUtils
@@ -36,12 +43,7 @@ import com.top.parkingcharges.entity.PayContentEntity
 import com.top.parkingcharges.entity.PayInfoEntity
 import com.top.parkingcharges.entity.TextContentEntity
 import com.top.parkingcharges.fragment.HostDialogFragment
-import com.top.parkingcharges.viewmodel.Action
-import com.top.parkingcharges.viewmodel.Event
-import com.top.parkingcharges.viewmodel.KEY_BAUD_RATE
-import com.top.parkingcharges.viewmodel.KEY_SERIAL_PORT
-import com.top.parkingcharges.viewmodel.MainViewModel
-import com.top.parkingcharges.viewmodel.dataStore
+import com.top.parkingcharges.viewmodel.*
 import es.dmoral.toasty.Toasty
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
@@ -50,6 +52,7 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import java.io.File
 import java.math.BigInteger
+import java.nio.charset.Charset
 import java.util.*
 
 
@@ -78,6 +81,12 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
 
     private lateinit var mSpeech: TextToSpeech
 
+    private var partialData: Triple<ParkingMsgType, Int, LinkedList<String>>? = null
+
+    private val msgAdapter by lazy {
+        MsgAdapter()
+    }
+
     @SuppressLint("SetTextI18n")
     @Suppress("DEPRECATION")
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -89,6 +98,11 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         )
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
+
+        binding.rvMsg.apply {
+            layoutManager = LinearLayoutManager(baseContext)
+            adapter = msgAdapter
+        }
 
         mSpeech = TextToSpeech(baseContext, this)
         navController =
@@ -221,85 +235,41 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
 
 
         SerialUtils.getInstance().setmSerialPortDirectorListens(object : SerialPortDirectorListens {
-            var partialData: Triple<ParkingMsgType, Int, LinkedList<String>>? = null
 
             /**
              * 接收回调
              * @param bytes 接收到的数据
              * @param serialPortEnum  串口类型
              */
+
+            @Synchronized
             override fun onDataReceived(bytes: ByteArray, serialPortEnum: SerialPortEnum) {
                 Log.i(TAG, "当前接收串口类型：" + serialPortEnum.name)
                 Log.i(TAG, "onDataReceived [ byte[] ]: " + bytes.contentToString())
-                Log.i(TAG, "onDataReceived [ String ]: " + String(bytes))
+                Log.i(TAG, "onDataReceived [ String ]: " + String(bytes, Charset.forName("GB2312")))
+
+                lifecycleScope.launch {
+                    msgAdapter.submitList(msgAdapter.currentList + bytes.joinToString(separator = ",") { eachByte ->
+                        "%02x".format(eachByte)
+                    })
+                }
 
                 val list = LinkedList(bytes.joinToString(separator = ",") { eachByte ->
                     "%02x".format(eachByte)
                 }.split(","))
+
                 if (partialData == null) {
-                    when (getType(list)) {
-                        ParkingMsgType.E_FIVE -> {
-                            try {
-                                parseHexList(list, serialPortEnum)
-                            } catch (e: Exception) {
-                                try {
-                                    val fiveHex = list.getOrNull(5)
-                                    val sixHex = list.getOrNull(6)
-                                    if (fiveHex != null && sixHex != null) {
-                                        val dataLength = (fiveHex + sixHex).toInt(16)
-                                        partialData =
-                                            Triple(ParkingMsgType.E_FIVE, dataLength + 9, list)
-                                    }
-                                } catch (_: Exception) {
-                                }
-                            }
-                        }
-
-                        ParkingMsgType.SIX_E -> {
-                            try {
-                                parsePayList(list, serialPortEnum)
-                            } catch (e: Exception) {
-                                try {
-                                    val fiveHex = list.getOrNull(5)
-                                    val sixHex = list.getOrNull(6)
-                                    if (fiveHex != null && sixHex != null) {
-                                        val dataLength = (fiveHex + sixHex).toInt(16)
-                                        partialData =
-                                            Triple(ParkingMsgType.SIX_E, dataLength + 9, list)
-                                    }
-                                } catch (_: Exception) {
-                                }
-                            }
-                        }
-
-                        ParkingMsgType.UNKNOWN -> {
-                            //do nothing
-                        }
-                    }
+                    val length = getLength(list)
+                    handleList(list, length, getType(list), serialPortEnum)
                 } else {
-                    if (partialData!!.third.size + list.size > partialData!!.second) {
-                        partialData = null
-                        return
-                    }
                     partialData?.third?.addAll(list)
-                    when (partialData?.first) {
-                        ParkingMsgType.E_FIVE -> {
-                            try {
-                                parseHexList(list, serialPortEnum)
-                                partialData = null
-                            } catch (_: Exception) {
-                            }
+                    if (partialData!!.third.size >= partialData!!.second) {
+                        val first = partialData?.first
+                        val second = partialData?.second
+                        val third = partialData?.third
+                        if (first != null && second != null && third != null) {
+                            handleList(third, getLength(third), getType(third), serialPortEnum)
                         }
-
-                        ParkingMsgType.SIX_E -> {
-                            try {
-                                parsePayList(list, serialPortEnum)
-                                partialData = null
-                            } catch (_: Exception) {
-                            }
-                        }
-
-                        else -> {}
                     }
                 }
 
@@ -345,6 +315,80 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
 
     }
 
+    private fun handleList(
+        list: LinkedList<String>,
+        length: Int,
+        parkingMsgType: ParkingMsgType,
+        serialPortEnum: SerialPortEnum
+    ) {
+        when (parkingMsgType) {
+            ParkingMsgType.E_FIVE -> {
+                if (list.size <= length) {
+                    try {
+                        parseHexList(list, serialPortEnum)
+                        partialData = null
+                    } catch (e: Exception) {
+                        if (length > 0) {
+                            partialData =
+                                Triple(ParkingMsgType.E_FIVE, length, list)
+                        }
+                    }
+                } else {
+                    try {
+                        parseHexList(
+                            LinkedList(list.subList(0, length)),
+                            serialPortEnum
+                        )
+                        val linkedList = LinkedList(list.subList(length - 1, list.size))
+                        handleList(
+                            linkedList,
+                            getLength(linkedList),
+                            parkingMsgType,
+                            serialPortEnum
+                        )
+                    } catch (_: Exception) {
+                    }
+                }
+            }
+
+            ParkingMsgType.SIX_E -> {
+                if (list.size <= length) {
+                    try {
+                        parsePayList(list, serialPortEnum)
+                        partialData = null
+                    } catch (e: Exception) {
+                        if (length > 0) {
+                            partialData =
+                                Triple(ParkingMsgType.SIX_E, length, list)
+                        }
+                    }
+                } else {
+                    try {
+                        parsePayList(
+                            LinkedList(list.subList(0, length)),
+                            serialPortEnum
+                        )
+                        val linkedList = LinkedList(list.subList(length - 1, list.size))
+                        handleList(
+                            linkedList,
+                            getLength(linkedList),
+                            parkingMsgType,
+                            serialPortEnum
+                        )
+                    } catch (_: Exception) {
+                    }
+                }
+
+            }
+
+            ParkingMsgType.UNKNOWN -> {
+                partialData = null
+                //do nothing
+            }
+        }
+
+    }
+
     private fun getType(hexList: LinkedList<String>): ParkingMsgType {
         val orNull = hexList.getOrNull(4)
         return if ("E5".equals(orNull, true)) {
@@ -354,6 +398,15 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         } else {
             ParkingMsgType.UNKNOWN
         }
+    }
+
+
+    private fun getLength(hexList: LinkedList<String>): Int {
+        val fiveHex = hexList.getOrNull(5)
+        val sixHex = hexList.getOrNull(6)
+        return if (fiveHex != null && sixHex != null) {
+            (fiveHex + sixHex).toInt(16)
+        } else 0
     }
 
     private fun parseHexList(hexList: LinkedList<String>, serialPort: SerialPortEnum) {
@@ -706,6 +759,37 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         } else {
             //初始化TextToSpeech引擎失败
         }
+    }
+}
+
+class MsgAdapter : ListAdapter<String, MsgAdapter.MsgViewHolder>(object :
+    DiffUtil.ItemCallback<String>() {
+    override fun areItemsTheSame(oldItem: String, newItem: String): Boolean {
+        return oldItem == newItem
+    }
+
+    override fun areContentsTheSame(oldItem: String, newItem: String): Boolean {
+        return oldItem == newItem
+    }
+}) {
+
+    class MsgViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView)
+
+    override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): MsgViewHolder {
+        val textView = TextView(parent.context).apply {
+            val layoutParams = ViewGroup.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+            )
+            setLayoutParams(layoutParams)
+            setTextColor(Color.BLACK)
+            textSize = 20f
+        }
+        return MsgViewHolder(textView)
+    }
+
+    override fun onBindViewHolder(holder: MsgViewHolder, position: Int) {
+        (holder.itemView as TextView).text = "收到消息" + getItem(position)
     }
 }
 

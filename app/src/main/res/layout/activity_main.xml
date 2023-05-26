@@ -27,10 +27,11 @@
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toEndOf="parent" />
 
-    <ImageView
+    <androidx.recyclerview.widget.RecyclerView
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintBottom_toBottomOf="parent"
-        android:id="@+id/qr_code"
+        android:id="@+id/rvMsg"
+        android:background="@color/purple_200"
         android:layout_width="200dp"
         android:layout_height="200dp"/>
 
