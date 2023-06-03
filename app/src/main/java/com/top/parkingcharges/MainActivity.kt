@@ -17,6 +17,8 @@ import android.view.WindowManager
 import android.widget.TextView
 import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.view.isVisible
+import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.lifecycle.lifecycleScope
 import androidx.navigation.NavController
@@ -45,6 +47,7 @@ import com.top.parkingcharges.entity.TextContentEntity
 import com.top.parkingcharges.fragment.HostDialogFragment
 import com.top.parkingcharges.viewmodel.*
 import es.dmoral.toasty.Toasty
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.firstOrNull
@@ -209,6 +212,13 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             binding.tvUuid.text = firstOrNull
         }
 
+        lifecycleScope.launch {
+            baseContext.dataStore.data.collectLatest {
+                val s = it[booleanPreferencesKey(KEY_LOG_SWITCH)]
+                binding.rvMsg.isVisible = s == true
+            }
+        }
+
         //连续点击事件
         binding.tvUuid.setOnClickListener {
             //每次点击时，数组向前移动一位
@@ -257,8 +267,6 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
 //        }
 
 
-
-
         SerialUtils.getInstance().setmSerialPortDirectorListens(object : SerialPortDirectorListens {
 
             /**
@@ -273,10 +281,12 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
                 Log.i(TAG, "onDataReceived [ byte[] ]: " + bytes.contentToString())
                 Log.i(TAG, "onDataReceived [ String ]: " + String(bytes, Charset.forName("GB2312")))
 
-                lifecycleScope.launch {
-                    msgAdapter.submitList(msgAdapter.currentList + (bytes.joinToString(separator = ",") { eachByte ->
-                        "%02x".format(eachByte)
-                    }).uppercase())
+                lifecycleScope.launch(Dispatchers.Main) {
+                    if (binding.rvMsg.isVisible) {
+                        msgAdapter.submitList(msgAdapter.currentList + (bytes.joinToString(separator = ",") { eachByte ->
+                            "%02x".format(eachByte)
+                        }).uppercase())
+                    }
                 }
 
                 val list = LinkedList(bytes.joinToString(separator = ",") { eachByte ->

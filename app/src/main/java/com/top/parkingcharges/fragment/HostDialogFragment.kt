@@ -7,6 +7,9 @@ import android.view.View
 import android.view.ViewGroup
 import android.view.ViewGroup.LayoutParams
 import android.widget.TextView
+import androidx.datastore.preferences.core.booleanPreferencesKey
+import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.fragment.app.DialogFragment
 import androidx.fragment.app.activityViewModels
 import androidx.lifecycle.lifecycleScope
@@ -25,14 +28,14 @@ import com.kongqw.serialportlibrary.enumerate.SerialPortEnum
 import com.kongqw.serialportlibrary.enumerate.SerialStatus
 import com.kongqw.serialportlibrary.listener.SerialPortDirectorListens
 import com.top.parkingcharges.databinding.DialogFragmentHostBinding
-import com.top.parkingcharges.viewmodel.HostPort
-import com.top.parkingcharges.viewmodel.MainViewModel
+import com.top.parkingcharges.viewmodel.*
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import java.io.File
 
 
-class HostDialogFragment() : DialogFragment() {
+class HostDialogFragment : DialogFragment() {
     private val serialHostAdapter by lazy {
         SerialHostAdapter()
     }
@@ -102,6 +105,22 @@ class HostDialogFragment() : DialogFragment() {
 
         binding.btCancel.setOnClickListener {
             dismissAllowingStateLoss()
+        }
+
+
+        lifecycleScope.launch {
+            requireContext().dataStore.data.collectLatest {
+                val s = it[booleanPreferencesKey(KEY_LOG_SWITCH)]
+                binding.tvSwitch.isChecked = s == true
+            }
+        }
+
+        binding.tvSwitch.setOnCheckedChangeListener { _, isChecked ->
+            lifecycleScope.launch {
+                requireContext().dataStore.edit {
+                    it[booleanPreferencesKey(KEY_LOG_SWITCH)] = isChecked
+                }
+            }
         }
 
     }

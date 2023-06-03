@@ -35,6 +35,7 @@ val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "se
 
 const val KEY_SERIAL_PORT = "KEY_SERIAL_PORT"
 const val KEY_BAUD_RATE = "KEY_BAUD_RATE"
+const val KEY_LOG_SWITCH = "KEY_LOG_SWITCH"
 
 class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val mApplication = application
