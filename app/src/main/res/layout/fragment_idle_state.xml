@@ -4,22 +4,30 @@
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    tools:background="@color/black">
+    tools:background="@color/white">
+
+    <ImageView
+        android:id="@+id/iv_bg"
+        app:layout_constraintTop_toTopOf="parent"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:scaleType="centerCrop"
+        android:background="@drawable/demo_bg"
+        app:layout_constraintHeight_percent="0.7" />
 
     <TextClock
         android:id="@+id/tv_date"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="@dimen/top_area_margin_top"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
         android:fontFamily="sans-serif-medium"
         android:format24Hour="yyyy年MM月dd日 \n\n\n EEEE  aa  HH:mm"
         android:gravity="center"
-        android:textColor="@color/white"
+        android:textColor="@color/text_color"
         android:textSize="@dimen/text_large"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/iv_bg"
         tools:text="2022 年 12 月 25 日" />
 
 </androidx.constraintlayout.widget.ConstraintLayout>

@@ -178,31 +178,31 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             }
         }
 
-        lifecycleScope.launchWhenCreated {
-            var index = 0
-            if (viewModel.backgroundColors.size == 0) {
-                return@launchWhenCreated
-            }
-            while (true) {
-                if (viewModel.backgroundColors.size > 1) {
-                    val current = viewModel.backgroundColors[index]
-                    val next = if (index == viewModel.backgroundColors.size - 1) {
-                        viewModel.backgroundColors[0]
-                    } else viewModel.backgroundColors[index + 1]
-                    applyColorFade(
-                        binding.rlRoot,
-                        current,
-                        next
-                    )
-                    if (index == viewModel.backgroundColors.size - 1) {
-                        index = 0
-                    } else {
-                        index++
-                    }
-                }
-                delay(DURATION_SLIDE)
-            }
-        }
+//        lifecycleScope.launchWhenCreated {
+//            var index = 0
+//            if (viewModel.backgroundColors.size == 0) {
+//                return@launchWhenCreated
+//            }
+//            while (true) {
+//                if (viewModel.backgroundColors.size > 1) {
+//                    val current = viewModel.backgroundColors[index]
+//                    val next = if (index == viewModel.backgroundColors.size - 1) {
+//                        viewModel.backgroundColors[0]
+//                    } else viewModel.backgroundColors[index + 1]
+//                    applyColorFade(
+//                        binding.rlRoot,
+//                        current,
+//                        next
+//                    )
+//                    if (index == viewModel.backgroundColors.size - 1) {
+//                        index = 0
+//                    } else {
+//                        index++
+//                    }
+//                }
+//                delay(DURATION_SLIDE)
+//            }
+//        }
 
         lifecycleScope.launchWhenCreated {
             val firstOrNull = viewModel.getUUID()
@@ -224,14 +224,39 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
                 )
             }
         }
-
+//        val dex =
+//            "1064FFFF6E5400020015011900FF00000008BBB6D3ADB9E2C1D90D011501190000FF000019CBD5424D38303753C1D9CAB1B3B5CAA3D3E0B3B5CEBB3A3738000A18CBD5424D383037532CC1D9CAB1B3B52CBBB6D3ADB9E2C1D9002870"
 
 //        lifecycleScope.launch {
-//            delay(10000)
-//            parsePayList(payArray)
-//            delay(10000L)
-//            parseHexList(hexArray)
+//            val list = LinkedList(
+//                BigInteger(dex, 16).toByteArray().joinToString(separator = ",") { eachByte ->
+//                    "%02x".format(eachByte)
+//                }.split(",")
+//            )
+
+//            if (partialData == null) {
+//                val length = getLength(list)
+//                handleList(list, length, getType(list), SerialPortEnum.SERIAL_ONE)
+//            } else {
+//                partialData?.third?.addAll(list)
+//                if (partialData!!.third.size >= partialData!!.second) {
+//                    val first = partialData?.first
+//                    val second = partialData?.second
+//                    val third = partialData?.third
+//                    if (first != null && second != null && third != null) {
+//                        handleList(
+//                            third,
+//                            getLength(third),
+//                            getType(third),
+//                            SerialPortEnum.SERIAL_ONE
+//                        )
+//                    }
+//                }
+//            }
+
 //        }
+
+
 
 
         SerialUtils.getInstance().setmSerialPortDirectorListens(object : SerialPortDirectorListens {
@@ -249,9 +274,9 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
                 Log.i(TAG, "onDataReceived [ String ]: " + String(bytes, Charset.forName("GB2312")))
 
                 lifecycleScope.launch {
-                    msgAdapter.submitList(msgAdapter.currentList + bytes.joinToString(separator = ",") { eachByte ->
+                    msgAdapter.submitList(msgAdapter.currentList + (bytes.joinToString(separator = ",") { eachByte ->
                         "%02x".format(eachByte)
-                    })
+                    }).uppercase())
                 }
 
                 val list = LinkedList(bytes.joinToString(separator = ",") { eachByte ->
@@ -321,8 +346,11 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         parkingMsgType: ParkingMsgType,
         serialPortEnum: SerialPortEnum
     ) {
+        if (length == 0 || list.isEmpty()) {
+            return
+        }
         when (parkingMsgType) {
-            ParkingMsgType.E_FIVE -> {
+            ParkingMsgType.SIX_E -> {
                 if (list.size <= length) {
                     try {
                         parseHexList(list, serialPortEnum)
@@ -351,7 +379,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
                 }
             }
 
-            ParkingMsgType.SIX_E -> {
+            ParkingMsgType.E_FIVE -> {
                 if (list.size <= length) {
                     try {
                         parsePayList(list, serialPortEnum)
@@ -375,7 +403,8 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
                             parkingMsgType,
                             serialPortEnum
                         )
-                    } catch (_: Exception) {
+                    } catch (e: Exception) {
+                        e.printStackTrace()
                     }
                 }
 
@@ -402,11 +431,18 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
 
 
     private fun getLength(hexList: LinkedList<String>): Int {
+        val vr = hexList.getOrNull(1)?.toInt(16)
         val fiveHex = hexList.getOrNull(5)
         val sixHex = hexList.getOrNull(6)
-        return if (fiveHex != null && sixHex != null) {
-            (fiveHex + sixHex).toInt(16)
-        } else 0
+        return if (fiveHex != null && sixHex != null && vr != null) {
+            if (vr == 100) {
+                fiveHex.toInt(16) + 8
+            } else {
+                (fiveHex + sixHex).toInt(16) + 9
+            }
+        } else {
+            0
+        }
     }
 
     private fun parseHexList(hexList: LinkedList<String>, serialPort: SerialPortEnum) {
@@ -476,7 +512,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         try {
             SerialUtils.getInstance().sendData(
                 serialPort,
-                BigInteger("00 C8 FF FF E5 01 00 00 6F 10", 16).toByteArray()
+                BigInteger("00 64 FF FF 6E 01 00 57 69", 16).toByteArray()
             )
             speak(voiceContent)
         } catch (_: Exception) {
@@ -494,7 +530,6 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         val cmd = hexList.pop()
         val dl =
             if (vr == 100) hexList.pop().toInt(16) else (hexList.pop() + hexList.pop()).toInt(16)
-
         val sf = hexList.pop()
         val em = hexList.pop()
         val etm = hexList.pop()
@@ -503,13 +538,17 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         val ven = hexList.pop()
         val tl = hexList.pop().toInt(16)
         val voiceStringBuilder = StringBuilder()
-        repeat(tl) {
-            voiceStringBuilder.append(hexList.pop())
+        if (tl > 0) {
+            repeat(tl) {
+                voiceStringBuilder.append(hexList.pop())
+            }
         }
-        val text =
+        val text = if (voiceStringBuilder.isNotEmpty()) {
             BigInteger(voiceStringBuilder.toString(), 16).toByteArray().toString(
                 charset("GB2312")
             ).trim()
+        } else ""
+
         val payContentEntity = PayContentEntity(
             sf = sf,
             em = em,
@@ -535,7 +574,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         try {
             SerialUtils.getInstance().sendData(
                 serialPort,
-                BigInteger("00 64 FF FF 6E 01 00 57 69", 16).toByteArray()
+                BigInteger("00 C8 FF FF E5 01 00 00 6F 10", 16).toByteArray()
             )
             if (payContentEntity.ven == "81") {
                 speak(payContentEntity.text)
