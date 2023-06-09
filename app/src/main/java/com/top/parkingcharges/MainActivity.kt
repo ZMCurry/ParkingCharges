@@ -146,7 +146,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
                 if (!serialPort.isNullOrEmpty() && !baudRate.isNullOrEmpty()) {
                     Pair(serialPort, baudRate)
                 } else {
-                    null
+                    Pair("/dev/ttsS2", "9600")
                 }
             }.firstOrNull()
             if (firstOrNull != null) {
