@@ -264,36 +264,40 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
 //        val dex2 = "00,64,FF,FF,6E,4D,00,02,00,15,01,19,00,FF,00,00,00,08,D2,BB,C2,B7,CB,B3,B7,E7,0D,01,15,01,19,00,00,FF,00,00,0E,CD,EE,42,39,43,38,39,31,C1,D9,CA,B1,B3,B5,00,0A,1C,CD,EE,42,39,43,38,39,31"
 //        val dex3 = "2C,C1,D9,CA,B1,B3,B5,2C,D7,A3,C4,FA,D2,BB,C2,B7,CB,B3,B7,E7,00,7A,0C"
 //
+
+//        val dex1 = "00,64,FF,FF,6E,4D,00,02,00,15,01,19,00,FF,00,00,00,08,D2,BB,C2,B7,CB,B3,B7,E7,0D,01,15,01,19,00,00,FF,00,00,0E,CB,D5,45,4D,4A,32,36,31,C1,D9,CA,B1,B3,B5,00,0A,1C,CB,D5,45,4D,4A,32,36,31,2C,C1,D9,CA,B1,B3,B5,2C,D7,A3,C4,FA,D2,BB,C2,B7,CB,B3,B7,E7,00,39,46"
+////        val dex2 = "00,C8,FF,FF,E5,2F,01,01,00,01,78,00,81,76,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,CF,E6,46,51,45,33,37,33,2C,CD,A3,B3,B5,38,D0,A1,CA,B1,32,38,B7,D6,D6,D3,31,34,C3,EB,2C,C7,EB,BD,C9,B7,D1,35,D4,AA,42,4D,B2,00,00,00,00,00,00,00,3E,00,00,00,28,00,00,00,1D,00,00,00,E3,FF,FF,FF,01,00,01,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,FF,FF,FF,00,00,00,00,00,FE,9D,4B,F8,82,D7,CA,08,BA,27,8A,E8,BA,6E,22,E8,BA,BF,92,E8,82,E2,32,08,FE,AA,AB,F8,00,6B,58,00,F6,72,ED,98,D1,46,8B,68,E2,59,E3,68,34,B0,B0,B0,87,69,69,68,14,66,BC,B8,FF,18,E5,A0,B8,67,7F,68,CB,B8,45,80,ED,B9,DB,B8,8B,15,76,78,65,18,9F,E0,07,C2,AF,B8,00,1E,A8,D0,FE,45,4A,88,82,97,D8,90,BA,54,4F,88,BA,D6,4A,B0,BA,C6,22,20,82,DD,D1,38,FE,F7,7F,F0,67,EE"
 //        lifecycleScope.launch {
-//            repeat(3) {
-//                val list = when (it) {
-//                    0 -> {
-//                        LinkedList(
-//                            BigInteger(dex1.replace(",", ""), 16).toByteArray()
-//                                .joinToString(separator = ",") { eachByte ->
-//                                    "%02x".format(eachByte)
-//                                }.split(",")
-//                        )
-//                    }
-//
-//                    1 -> {
-//                        LinkedList(
-//                            BigInteger(dex2.replace(",", ""), 16).toByteArray()
-//                                .joinToString(separator = ",") { eachByte ->
-//                                    "%02x".format(eachByte)
-//                                }.split(",")
-//                        )
-//                    }
-//
-//                    else -> {
-//                        LinkedList(
-//                            BigInteger(dex3.replace(",", ""), 16).toByteArray()
-//                                .joinToString(separator = ",") { eachByte ->
-//                                    "%02x".format(eachByte)
-//                                }.split(",")
-//                        )
-//                    }
+//            repeat(1) {
+//              val list =   LinkedList(
+//                    BigInteger(dex1.replace(",", ""), 16).toByteArray()
+//                        .joinToString(separator = ",") { eachByte ->
+//                            "%02x".format(eachByte)
+//                        }.split(",")
+//                ).apply {
+//                    add(0,"00")
 //                }
+////                val list = when (it) {
+////                    0 -> {
+////                        LinkedList(
+////                            BigInteger(dex1.replace(",", ""), 16).toByteArray()
+////                                .joinToString(separator = ",") { eachByte ->
+////                                    "%02x".format(eachByte)
+////                                }.split(",")
+////                        ).apply {
+////                            add(0,"00")
+////                        }
+////                    }
+////
+////                    else -> {
+////                        LinkedList(
+////                            BigInteger(dex2.replace(",", ""), 16).toByteArray()
+////                                .joinToString(separator = ",") { eachByte ->
+////                                    "%02x".format(eachByte)
+////                                }.split(",")
+////                        )
+////                    }
+////                }
 //                if (partialData == null) {
 //                    val length = getLength(list)
 //                    handleList(list, length, getType(list), SerialPortEnum.SERIAL_ONE)
@@ -441,7 +445,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
                             Triple(ParkingMsgType.SIX_E, length, list)
                     } else {
                         try {
-                            parsePayList(list, serialPortEnum)
+                            parseHexList(list, serialPortEnum)
                         } catch (e: Exception) {
                             partialData = null
                         }
