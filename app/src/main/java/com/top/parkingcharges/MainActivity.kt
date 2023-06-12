@@ -30,8 +30,13 @@ import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.RecyclerView
 import com.azhon.appupdate.listener.OnDownloadListener
 import com.azhon.appupdate.manager.DownloadManager
+import com.blankj.utilcode.constant.PermissionConstants
 import com.blankj.utilcode.util.AdaptScreenUtils
 import com.blankj.utilcode.util.AppUtils
+import com.blankj.utilcode.util.FileIOUtils
+import com.blankj.utilcode.util.FileUtils
+import com.blankj.utilcode.util.PathUtils
+import com.blankj.utilcode.util.PermissionUtils
 import com.blankj.utilcode.util.ToastUtils
 import com.cl.log.XLog
 import com.kongqw.serialportlibrary.Driver
@@ -53,6 +58,7 @@ import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.io.File
 import java.math.BigInteger
 import java.nio.charset.Charset
@@ -90,11 +96,17 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         MsgAdapter()
     }
 
+
+    private var count = 0
+
     @SuppressLint("SetTextI18n")
     @Suppress("DEPRECATION")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         requestWindowFeature(Window.FEATURE_NO_TITLE)
+
+
+
         window.setFlags(
             WindowManager.LayoutParams.FLAG_FULLSCREEN,
             WindowManager.LayoutParams.FLAG_FULLSCREEN
@@ -237,33 +249,72 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
 //        val dex =
 //            "1064FFFF6E5400020015011900FF00000008BBB6D3ADB9E2C1D90D011501190000FF000019CBD5424D38303753C1D9CAB1B3B5CAA3D3E0B3B5CEBB3A3738000A18CBD5424D383037532CC1D9CAB1B3B52CBBB6D3ADB9E2C1D9002870"
 
-//        lifecycleScope.launch {
-//            val list = LinkedList(
-//                BigInteger(dex, 16).toByteArray().joinToString(separator = ",") { eachByte ->
-//                    "%02x".format(eachByte)
-//                }.split(",")
-//            )
+//        val dex1 =
+//            "00,C8,FF,FF,E5,2F,01,01,00,01,78,00,81,76,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,D5,E3,4A,38,32,4D,37,32,2C,CD,A3,B3,B5,30,D0,A1,CA,B1,35,30,B7,D6,D6,D3,31,39,C3,EB,2C,C7,EB,BD,C9,B7,D1,32,D4,AA,42,4D,B2,00,00,00,00,00,00,00,3E,00,00,00,28,00,00,00,1D,00,00,00,E3,FF,FF,FF,01,00,01,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00"
+//        val dex2 =
+//            "FF,FF,FF,00,00,00,00,00,FE,9D,4B,F8,82,D7,CA,08,BA,27,8A,E8,BA,6E,22,E8,BA,BF,92,E8,82,E2,32,08,FE,AA,AB,F8,00,6B,58,00,F6,72,ED,98,D1,46,8B,68,E2,59,E3,68,34,B0,B0,B0,87,69,69,68,14,66,BC,B8,FF,18,E5,A0,B8,67,7F,68,CB,B8,45,80,ED,B9,DB,B8,8B,15,76,78,65,18,9F,E0,07,C2,AF,B8,00,1E,A8,D0,FE,45,4A,88,82,97,D8,90,BA,54,4F,88,BA,D6,4A,B0,BA,C6,22,20,82,DD,D1,38,FE,F7,7F,F0,A3,78"
+//        val dex3 =
+//            "00,64,FF,FF,6E,4D,00,02,00,15,01,19,00,FF,00,00,00,08,D2,BB,C2,B7,CB,B3,B7,E7,0D,01,15,01,19,00,00,FF,00,00,0E,D5,E3,4A,38,32,4D,37,32,C1,D9,CA,B1,B3,B5,00,0A,1C,D5,E3,4A,38,32,4D,37,32,2C,C1,D9,CA,B1,B3,B5,2C,D7,A3,C4,FA,D2,BB,C2,B7,CB,B3,B7,E7,00,27,62"
 
-//            if (partialData == null) {
-//                val length = getLength(list)
-//                handleList(list, length, getType(list), SerialPortEnum.SERIAL_ONE)
-//            } else {
-//                partialData?.third?.addAll(list)
-//                if (partialData!!.third.size >= partialData!!.second) {
-//                    val first = partialData?.first
-//                    val second = partialData?.second
-//                    val third = partialData?.third
-//                    if (first != null && second != null && third != null) {
-//                        handleList(
-//                            third,
-//                            getLength(third),
-//                            getType(third),
-//                            SerialPortEnum.SERIAL_ONE
+//        val dex1 = "00,C8,FF,FF,E5,2E,01,01,00,01,78,00,81,75,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20"
+//        val dex2 = "20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,CB,D5,45,39,38,43,50,37,2C,CD,A3,B3,B5,30,D0,A1,CA,B1,34,38,B7,D6,D6,D3,32,C3,EB,2C,C7,EB,BD,C9,B7,D1,32,D4,AA,42,4D,B2,00,00,00,00,00,00,00,3E,00,00,00,28,00,00,00,1D,00,00,00,E3,FF,FF,FF,01,00,01,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,FF,FF,FF,00,00,00,00,00,FE,9D,4B,F8,82,D7,CA,08,BA,27,8A,E8,BA,6E,22,E8,BA,BF,92,E8,82,E2,32,08,FE,AA,AB,F8,00,6B,58,00,F6,72,ED,98,D1,46,8B,68,E2,59,E3,68,34,B0,B0,B0,87,69,69,68,14,66,BC,B8,FF,18,E5,A0,B8,67,7F,68,CB,B8,45,80,ED,B9,DB,B8,8B,15,76,78,65,18,9F,E0,07,C2,AF,B8,00,1E,A8,D0,FE,45,4A,88,82,97,D8,90,BA,54,4F,88,BA,D6,4A,B0,BA,C6,22,20,82,DD,D1,38,FE,F7,7F,F0,F9,D2"
+//        val dex3 = "00,64,FF,FF,6E,4D,00,02,00,15,01,19,00,FF,00,00,00,08,D2,BB,C2,B7,CB,B3,B7,E7,0D,01,15,01,19,00,00,FF,00,00,0E,CB,D5,45,39,38,43,50,37,C1,D9,CA,B1,B3,B5,00,0A,1C,CB,D5,45,39,38,43,50,37,2C,C1,D9,CA,B1,B3,B5,2C,D7,A3,C4,FA,D2,BB,C2,B7,CB,B3,B7,E7,00,AE,7D"
+
+//        val dex1 = "00,C8,FF,FF,E5,2F,01,01,00,01,78,00,81,76,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,CD,EE,42,39,43,38,39,31,2C,CD,A3,B3,B5,31,D0,A1,CA,B1,35,38,B7,D6,D6,D3,33,39,C3,EB,2C,C7,EB,BD,C9,B7,D1,35,D4,AA,42,4D,B2,00,00,00,00,00,00,00,3E,00,00,00,28,00,00,00,1D,00,00,00,E3,FF,FF,FF,01,00,01,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,FF,FF,FF,00,00,00,00,00,FE,9D,4B,F8,82,D7,CA,08,BA,27,8A,E8,BA,6E,22,E8,BA,BF,92,E8,82,E2,32,08,FE,AA,AB,F8,00,6B,58,00,F6,72,ED,98,D1,46,8B,68,E2,59,E3,68,34,B0,B0,B0,87,69,69,68,14,66,BC,B8,FF,18,E5,A0,B8,67,7F,68,CB,B8,45,80,ED,B9,DB,B8,8B,15,76,78,65,18,9F,E0,07,C2,AF,B8,00,1E,A8,D0,FE,45,4A,88,82,97,D8,90,BA,54,4F,88,BA,D6,4A,B0,BA,C6,22,20,82,DD,D1,38,FE,F7,7F,F0,C3,6D"
+//        val dex2 = "00,64,FF,FF,6E,4D,00,02,00,15,01,19,00,FF,00,00,00,08,D2,BB,C2,B7,CB,B3,B7,E7,0D,01,15,01,19,00,00,FF,00,00,0E,CD,EE,42,39,43,38,39,31,C1,D9,CA,B1,B3,B5,00,0A,1C,CD,EE,42,39,43,38,39,31"
+//        val dex3 = "2C,C1,D9,CA,B1,B3,B5,2C,D7,A3,C4,FA,D2,BB,C2,B7,CB,B3,B7,E7,00,7A,0C"
+//
+//        lifecycleScope.launch {
+//            repeat(3) {
+//                val list = when (it) {
+//                    0 -> {
+//                        LinkedList(
+//                            BigInteger(dex1.replace(",", ""), 16).toByteArray()
+//                                .joinToString(separator = ",") { eachByte ->
+//                                    "%02x".format(eachByte)
+//                                }.split(",")
+//                        )
+//                    }
+//
+//                    1 -> {
+//                        LinkedList(
+//                            BigInteger(dex2.replace(",", ""), 16).toByteArray()
+//                                .joinToString(separator = ",") { eachByte ->
+//                                    "%02x".format(eachByte)
+//                                }.split(",")
+//                        )
+//                    }
+//
+//                    else -> {
+//                        LinkedList(
+//                            BigInteger(dex3.replace(",", ""), 16).toByteArray()
+//                                .joinToString(separator = ",") { eachByte ->
+//                                    "%02x".format(eachByte)
+//                                }.split(",")
 //                        )
 //                    }
 //                }
+//                if (partialData == null) {
+//                    val length = getLength(list)
+//                    handleList(list, length, getType(list), SerialPortEnum.SERIAL_ONE)
+//                } else {
+//                    partialData?.third?.addAll(list)
+//                    if (partialData!!.third.size >= partialData!!.second) {
+//                        val first = partialData?.first
+//                        val second = partialData?.second
+//                        val third = partialData?.third
+//                        if (first != null && second != null && third != null) {
+//                            handleList(
+//                                third,
+//                                getLength(third),
+//                                getType(third),
+//                                SerialPortEnum.SERIAL_ONE
+//                            )
+//                        }
+//                    }
+//                }
 //            }
-
+//
 //        }
 
 
@@ -282,10 +333,22 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
                 Log.i(TAG, "onDataReceived [ String ]: " + String(bytes, Charset.forName("GB2312")))
 
                 lifecycleScope.launch(Dispatchers.Main) {
+                    val uppercase = (bytes.joinToString(separator = ",") { eachByte ->
+                        "%02x".format(eachByte)
+                    }).uppercase()
+                    withContext(Dispatchers.IO) {
+                        FileIOUtils.writeFileFromString(
+                            logFile,
+                            "APP开启第${count + 1}次收到消息:$uppercase", true
+                        )
+                        FileIOUtils.writeFileFromString(
+                            logFile,
+                            "\n", true
+                        )
+                        count++
+                    }
                     if (binding.rvMsg.isVisible) {
-                        msgAdapter.submitList(msgAdapter.currentList + (bytes.joinToString(separator = ",") { eachByte ->
-                            "%02x".format(eachByte)
-                        }).uppercase())
+                        msgAdapter.submitList(msgAdapter.currentList + uppercase)
                     }
                 }
 
@@ -348,7 +411,18 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             }
         })
 
+
+        PermissionUtils.permission(PermissionConstants.STORAGE)
+            .callback { isAllGranted, granted, deniedForever, denied ->
+                if (isAllGranted) {
+                    FileUtils.createOrExistsFile(logFile)
+                }
+            }.request()
+
     }
+
+    private val logFile =
+        File(PathUtils.getExternalStoragePath() + File.separator + "parkingLog.txt")
 
     private fun handleList(
         list: LinkedList<String>,
@@ -362,13 +436,14 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         when (parkingMsgType) {
             ParkingMsgType.SIX_E -> {
                 if (list.size <= length) {
-                    try {
-                        parseHexList(list, serialPortEnum)
-                        partialData = null
-                    } catch (e: Exception) {
-                        if (length > 0) {
-                            partialData =
-                                Triple(ParkingMsgType.E_FIVE, length, list)
+                    if (list.size < length) {
+                        partialData =
+                            Triple(ParkingMsgType.SIX_E, length, list)
+                    } else {
+                        try {
+                            parsePayList(list, serialPortEnum)
+                        } catch (e: Exception) {
+                            partialData = null
                         }
                     }
                 } else {
@@ -391,13 +466,14 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
 
             ParkingMsgType.E_FIVE -> {
                 if (list.size <= length) {
-                    try {
-                        parsePayList(list, serialPortEnum)
-                        partialData = null
-                    } catch (e: Exception) {
-                        if (length > 0) {
-                            partialData =
-                                Triple(ParkingMsgType.SIX_E, length, list)
+                    if (list.size < length) {
+                        partialData =
+                            Triple(ParkingMsgType.E_FIVE, length, list)
+                    } else {
+                        try {
+                            parsePayList(list, serialPortEnum)
+                        } catch (e: Exception) {
+                            partialData = null
                         }
                     }
                 } else {
@@ -441,17 +517,22 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
 
 
     private fun getLength(hexList: LinkedList<String>): Int {
-        val vr = hexList.getOrNull(1)?.toInt(16)
-        val fiveHex = hexList.getOrNull(5)
-        val sixHex = hexList.getOrNull(6)
-        return if (fiveHex != null && sixHex != null && vr != null) {
-            if (vr == 100) {
-                fiveHex.toInt(16) + 8
-            } else {
-                (fiveHex + sixHex).toInt(16) + 9
-            }
+        val parkingMsgType = getType(hexList)
+        return if (parkingMsgType == ParkingMsgType.UNKNOWN) {
+            hexList.size
         } else {
-            0
+            val vr = hexList.getOrNull(1)?.toInt(16)
+            val fiveHex = hexList.getOrNull(5)
+            val sixHex = hexList.getOrNull(6)
+            if (fiveHex != null && sixHex != null && vr != null) {
+                if (vr == 100) {
+                    fiveHex.toInt(16) + 8
+                } else {
+                    (sixHex + fiveHex).toInt(16) + 9
+                }
+            } else {
+                0
+            }
         }
     }
 
