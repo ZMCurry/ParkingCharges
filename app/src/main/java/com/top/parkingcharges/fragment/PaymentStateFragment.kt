@@ -8,9 +8,8 @@ import androidx.fragment.app.Fragment
 import androidx.fragment.app.activityViewModels
 import androidx.lifecycle.flowWithLifecycle
 import androidx.lifecycle.lifecycleScope
-import androidx.navigation.fragment.findNavController
 import com.blankj.utilcode.util.ImageUtils
-import com.top.parkingcharges.R
+import com.king.zxing.util.CodeUtils
 import com.top.parkingcharges.databinding.FragmentPaymentStateBinding
 import com.top.parkingcharges.viewmodel.Event
 import com.top.parkingcharges.viewmodel.MainViewModel
@@ -41,7 +40,12 @@ class PaymentStateFragment : Fragment() {
             viewModel.viewState.flowWithLifecycle(lifecycle).collectLatest {
                 it.paymentInfo?.also { paymentInfo ->
                     val bitmap = withContext(Dispatchers.IO) {
-                        ImageUtils.getBitmap(BigInteger(paymentInfo.qrCode, 16).toByteArray(), 0)
+                        val origin = ImageUtils.getBitmap(
+                            BigInteger(paymentInfo.qrCode, 16).toByteArray(),
+                            0
+                        )
+                        val parseCode = CodeUtils.parseCode(origin)
+                        CodeUtils.createQRCode(parseCode, binding.ivQrCode.measuredWidth)
                     }
                     binding.ivQrCode.setImageBitmap(bitmap)
                     val stringList = paymentInfo.payContentEntity.text.split(",")
@@ -55,7 +59,6 @@ class PaymentStateFragment : Fragment() {
                     if (st != 0) {
                         countdownJob(st)
                     }
-//                    binding.tvPlateType.text = paymentInfo.plateType
                 }
             }
         }
