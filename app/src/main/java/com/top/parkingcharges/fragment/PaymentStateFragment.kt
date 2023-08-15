@@ -9,6 +9,7 @@ import androidx.fragment.app.activityViewModels
 import androidx.lifecycle.flowWithLifecycle
 import androidx.lifecycle.lifecycleScope
 import com.blankj.utilcode.util.ImageUtils
+import com.blankj.utilcode.util.ScreenUtils
 import com.king.zxing.util.CodeUtils
 import com.top.parkingcharges.databinding.FragmentPaymentStateBinding
 import com.top.parkingcharges.viewmodel.Event
@@ -45,7 +46,7 @@ class PaymentStateFragment : Fragment() {
                             0
                         )
                         val parseCode = CodeUtils.parseCode(origin)
-                        CodeUtils.createQRCode(parseCode, binding.ivQrCode.measuredWidth)
+                        CodeUtils.createQRCode(parseCode, ScreenUtils.getScreenWidth())
                     }
                     binding.ivQrCode.setImageBitmap(bitmap)
                     val stringList = paymentInfo.payContentEntity.text.split(",")

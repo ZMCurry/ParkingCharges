@@ -21,9 +21,7 @@ import androidx.core.view.isVisible
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.lifecycle.lifecycleScope
-import androidx.navigation.NavController
 import androidx.navigation.NavOptions
-import androidx.navigation.fragment.NavHostFragment
 import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.ListAdapter
@@ -31,16 +29,8 @@ import androidx.recyclerview.widget.RecyclerView
 import com.azhon.appupdate.listener.OnDownloadListener
 import com.azhon.appupdate.manager.DownloadManager
 import com.blankj.utilcode.constant.PermissionConstants
-import com.blankj.utilcode.util.AdaptScreenUtils
-import com.blankj.utilcode.util.AppUtils
-import com.blankj.utilcode.util.FileIOUtils
-import com.blankj.utilcode.util.FileUtils
-import com.blankj.utilcode.util.ImageUtils
-import com.blankj.utilcode.util.PathUtils
-import com.blankj.utilcode.util.PermissionUtils
-import com.blankj.utilcode.util.ToastUtils
+import com.blankj.utilcode.util.*
 import com.cl.log.XLog
-import com.king.zxing.util.CodeUtils
 import com.kongqw.serialportlibrary.Driver
 import com.kongqw.serialportlibrary.SerialUtils
 import com.kongqw.serialportlibrary.enumerate.SerialPortEnum
@@ -52,6 +42,9 @@ import com.top.parkingcharges.entity.PayContentEntity
 import com.top.parkingcharges.entity.PayInfoEntity
 import com.top.parkingcharges.entity.TextContentEntity
 import com.top.parkingcharges.fragment.HostDialogFragment
+import com.top.parkingcharges.fragment.IdleStateFragment
+import com.top.parkingcharges.fragment.PaymentStateFragment
+import com.top.parkingcharges.fragment.ReleaseStateFragment
 import com.top.parkingcharges.viewmodel.*
 import es.dmoral.toasty.Toasty
 import kotlinx.coroutines.Dispatchers
@@ -69,26 +62,9 @@ import java.util.*
 
 class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
 
-//    private lateinit var mNetty: NettyUtil
-
-    private val hexArray =
-        LinkedList(
-            "00 64 FF FF 6E 6D 00 04 00 15 01 19 00 FF 00 00 00 08 D2 BB C2 B7 CB B3 B7 E7 0D 01 15 01 19 00 00 FF 00 00 09 BB A6 41 41 50 36 33 37 35 0D 02 15 01 19 00 FF 00 00 00 06 C1 D9 CA B1 B3 B5 0D 03 15 01 19 00 FF 00 00 00 08 D0 BB D0 BB BB DD B9 CB 00 0A 1D BB A6 41 41 50 36 33 37 35 2C C1 D9 CA B1 B3 B5 2C D7 A3 C4 FA D2 BB C2 B7 CB B3 B7 E7 00 5C F3".split(
-                " "
-            )
-        )
-
-    private val payArray = LinkedList(
-        "00 C8 FF FF E5 2F 01 01 00 01 78 00 81 76 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 20 BB A6 42 39 39 31 48 35 2C CD A3 B3 B5 30 D0 A1 CA B1 34 35 B7 D6 D6 D3 31 38 C3 EB 2C C7 EB BD C9 B7 D1 35 D4 AA 42 4D B2 00 00 00 00 00 00 00 3E 00 00 00 28 00 00 00 1D 00 00 00 E3 FF FF FF 01 00 01 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 FF FF FF 00 00 00 00 00 FE C7 7B F8 82 9D 42 08 BA BA 8A E8 BA AF C2 E8 BA 94 32 E8 82 54 92 08 FE AA AB F8 00 B3 08 00 56 E2 CE F8 F0 FB 5D 18 2E 95 FD 38 70 38 38 38 4B A5 A5 A8 10 88 AA 80 8E CB E4 50 45 AA 3B A0 6B 7B 35 70 50 EA E8 A8 0E 54 C2 60 B9 5D CB 48 A7 57 4F D0 00 D7 68 A0 FE 77 6A A0 82 A4 E8 A0 BA 67 7F B8 BA 9A 86 78 BA 0A EE E8 82 91 1C F0 FE 44 4D C0 AE 9C".split(
-            " "
-        )
-    )
-
     private lateinit var binding: ActivityMainBinding
 
     private val viewModel by viewModels<MainViewModel>()
-
-    private lateinit var navController: NavController
 
     private lateinit var mSpeech: TextToSpeech
 
@@ -113,33 +89,17 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         )
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
+
+        supportFragmentManager.beginTransaction()
+            .replace(R.id.fcv, IdleStateFragment())
+            .commitNowAllowingStateLoss()
+
         binding.rvMsg.apply {
             layoutManager = LinearLayoutManager(baseContext)
             adapter = msgAdapter
         }
 
         mSpeech = TextToSpeech(baseContext, this)
-        navController =
-            (supportFragmentManager.findFragmentById(R.id.fcv) as NavHostFragment).navController
-
-//        initNetty()
-
-//        lifecycleScope.launchWhenStarted {
-//            viewModel.event.collectLatest {
-//                when (it) {
-//                    is Event.SendMsg -> {
-//                        sendNettyMsg(it.msg)
-//                    }
-//
-//                    is Event.LoginEvent -> {
-//                        if (it.succeed) {
-//                            Toasty.success(baseContext, getString(R.string.login_success)).show()
-//                            startHeartBeatJob()
-//                        }
-//                    }
-//                }
-//            }
-//        }
 
         lifecycleScope.launch {
             viewModel.newestHost.collectLatest {
@@ -168,55 +128,35 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
             }
         }
 
-        val navOptions: NavOptions = NavOptions.Builder()
-            .setEnterAnim(R.anim.slide_in_right) //进入动画
-            .setExitAnim(R.anim.slide_out_left) //退出动画
-            .setPopEnterAnim(R.anim.slide_in_left) //弹出进入动画
-            .setPopExitAnim(R.anim.slide_out_right) //弹出退出动画
-            .build()
+//        val navOptions: NavOptions = NavOptions.Builder()
+//            .setEnterAnim(R.anim.slide_in_right) //进入动画
+//            .setExitAnim(R.anim.slide_out_left) //退出动画
+//            .setPopEnterAnim(R.anim.slide_in_left) //弹出进入动画
+//            .setPopExitAnim(R.anim.slide_out_right) //弹出退出动画
+//            .build()
         lifecycleScope.launch {
             viewModel.event.collectLatest {
                 when (it) {
                     Event.Idle -> {
-                        navController.navigate(R.id.idleStateFragment, args = null, navOptions)
+                        supportFragmentManager.beginTransaction()
+                            .replace(R.id.fcv, IdleStateFragment())
+                            .commitNowAllowingStateLoss()
                     }
 
                     Event.Payment -> {
-                        navController.navigate(R.id.paymentStateFragment, args = null, navOptions)
+                        supportFragmentManager.beginTransaction()
+                            .replace(R.id.fcv, PaymentStateFragment())
+                            .commitNowAllowingStateLoss()
                     }
 
                     Event.Release -> {
-                        navController.navigate(R.id.releaseStateFragment, args = null, navOptions)
+                        supportFragmentManager.beginTransaction()
+                            .replace(R.id.fcv, ReleaseStateFragment())
+                            .commitNowAllowingStateLoss()
                     }
                 }
             }
         }
-
-//        lifecycleScope.launchWhenCreated {
-//            var index = 0
-//            if (viewModel.backgroundColors.size == 0) {
-//                return@launchWhenCreated
-//            }
-//            while (true) {
-//                if (viewModel.backgroundColors.size > 1) {
-//                    val current = viewModel.backgroundColors[index]
-//                    val next = if (index == viewModel.backgroundColors.size - 1) {
-//                        viewModel.backgroundColors[0]
-//                    } else viewModel.backgroundColors[index + 1]
-//                    applyColorFade(
-//                        binding.rlRoot,
-//                        current,
-//                        next
-//                    )
-//                    if (index == viewModel.backgroundColors.size - 1) {
-//                        index = 0
-//                    } else {
-//                        index++
-//                    }
-//                }
-//                delay(DURATION_SLIDE)
-//            }
-//        }
 
         lifecycleScope.launchWhenCreated {
             val firstOrNull = viewModel.getUUID()
@@ -245,60 +185,41 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
                 )
             }
         }
-//        val dex =
-//            "1064FFFF6E5400020015011900FF00000008BBB6D3ADB9E2C1D90D011501190000FF000019CBD5424D38303753C1D9CAB1B3B5CAA3D3E0B3B5CEBB3A3738000A18CBD5424D383037532CC1D9CAB1B3B52CBBB6D3ADB9E2C1D9002870"
+
 
 //        val dex1 =
-//            "00,C8,FF,FF,E5,2F,01,01,00,01,78,00,81,76,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,D5,E3,4A,38,32,4D,37,32,2C,CD,A3,B3,B5,30,D0,A1,CA,B1,35,30,B7,D6,D6,D3,31,39,C3,EB,2C,C7,EB,BD,C9,B7,D1,32,D4,AA,42,4D,B2,00,00,00,00,00,00,00,3E,00,00,00,28,00,00,00,1D,00,00,00,E3,FF,FF,FF,01,00,01,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00"
+//            "00,C8,FF,FF,E5,2F,01,01,00,01,78,00,81,76,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,CB,D5,55,56,31,31,37,4D,2C,CD,A3,B3,B5,30,D0,A1,CA,B1,34,37,B7,D6,D6,D3,35,32,C3,EB,2C,C7,EB,BD,C9,B7,D1,32,D4,AA,42,4D,B2,00,00,00,00,00,00,00,3E,00,00,00,28,00,00,00,1D,00,00,00,E3,FF,FF,FF,01,00,01,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,FF,FF,FF,00,00,00,00,00,FE,9D,4B,F8,82,D7,CA,08,BA,27,8A,E8,BA,6E,22,E8,BA,BF,92,E8,82,E2,32,08,FE,AA,AB,F8,00,6B,58,00,F6,72,ED,98,D1,46,8B,68,E2,59,E3,68,34,B0,B0,B0,87,69,69,68,14,66"
 //        val dex2 =
-//            "FF,FF,FF,00,00,00,00,00,FE,9D,4B,F8,82,D7,CA,08,BA,27,8A,E8,BA,6E,22,E8,BA,BF,92,E8,82,E2,32,08,FE,AA,AB,F8,00,6B,58,00,F6,72,ED,98,D1,46,8B,68,E2,59,E3,68,34,B0,B0,B0,87,69,69,68,14,66,BC,B8,FF,18,E5,A0,B8,67,7F,68,CB,B8,45,80,ED,B9,DB,B8,8B,15,76,78,65,18,9F,E0,07,C2,AF,B8,00,1E,A8,D0,FE,45,4A,88,82,97,D8,90,BA,54,4F,88,BA,D6,4A,B0,BA,C6,22,20,82,DD,D1,38,FE,F7,7F,F0,A3,78"
-//        val dex3 =
-//            "00,64,FF,FF,6E,4D,00,02,00,15,01,19,00,FF,00,00,00,08,D2,BB,C2,B7,CB,B3,B7,E7,0D,01,15,01,19,00,00,FF,00,00,0E,D5,E3,4A,38,32,4D,37,32,C1,D9,CA,B1,B3,B5,00,0A,1C,D5,E3,4A,38,32,4D,37,32,2C,C1,D9,CA,B1,B3,B5,2C,D7,A3,C4,FA,D2,BB,C2,B7,CB,B3,B7,E7,00,27,62"
-
-//        val dex1 = "00,C8,FF,FF,E5,2E,01,01,00,01,78,00,81,75,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20"
-//        val dex2 = "20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,CB,D5,45,39,38,43,50,37,2C,CD,A3,B3,B5,30,D0,A1,CA,B1,34,38,B7,D6,D6,D3,32,C3,EB,2C,C7,EB,BD,C9,B7,D1,32,D4,AA,42,4D,B2,00,00,00,00,00,00,00,3E,00,00,00,28,00,00,00,1D,00,00,00,E3,FF,FF,FF,01,00,01,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,FF,FF,FF,00,00,00,00,00,FE,9D,4B,F8,82,D7,CA,08,BA,27,8A,E8,BA,6E,22,E8,BA,BF,92,E8,82,E2,32,08,FE,AA,AB,F8,00,6B,58,00,F6,72,ED,98,D1,46,8B,68,E2,59,E3,68,34,B0,B0,B0,87,69,69,68,14,66,BC,B8,FF,18,E5,A0,B8,67,7F,68,CB,B8,45,80,ED,B9,DB,B8,8B,15,76,78,65,18,9F,E0,07,C2,AF,B8,00,1E,A8,D0,FE,45,4A,88,82,97,D8,90,BA,54,4F,88,BA,D6,4A,B0,BA,C6,22,20,82,DD,D1,38,FE,F7,7F,F0,F9,D2"
-//        val dex3 = "00,64,FF,FF,6E,4D,00,02,00,15,01,19,00,FF,00,00,00,08,D2,BB,C2,B7,CB,B3,B7,E7,0D,01,15,01,19,00,00,FF,00,00,0E,CB,D5,45,39,38,43,50,37,C1,D9,CA,B1,B3,B5,00,0A,1C,CB,D5,45,39,38,43,50,37,2C,C1,D9,CA,B1,B3,B5,2C,D7,A3,C4,FA,D2,BB,C2,B7,CB,B3,B7,E7,00,AE,7D"
-
-//        val dex1 =
-//            "00,C8,FF,FF,E5,2F,01,01,00,01,78,00,81,76,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,CD,EE,42,39,43,38,39,31,2C,CD,A3,B3,B5,31,D0,A1,CA,B1,35,38,B7,D6,D6,D3,33,39,C3,EB,2C,C7,EB,BD,C9,B7,D1,35,D4,AA,42,4D,B2,00,00,00,00,00,00,00,3E,00,00,00,28,00,00,00,1D,00,00,00,E3,FF,FF,FF,01,00,01,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,FF,FF,FF,00,00,00,00,00,FE,9D,4B,F8,82,D7,CA,08,BA,27,8A,E8,BA,6E,22,E8,BA,BF,92,E8,82,E2,32,08,FE,AA,AB,F8,00,6B,58,00,F6,72,ED,98,D1,46,8B,68,E2,59,E3,68,34,B0,B0,B0,87,69,69,68,14,66,BC,B8,FF,18,E5,A0,B8,67,7F,68,CB,B8,45,80,ED,B9,DB,B8,8B,15,76,78,65,18,9F,E0,07,C2,AF,B8,00,1E,A8,D0,FE,45,4A,88,82,97,D8,90,BA,54,4F,88,BA,D6,4A,B0,BA,C6,22,20,82,DD,D1,38,FE,F7,7F,F0,C3,6D"
-//        val dex2 =
-//            "00,64,FF,FF,6E,4D,00,02,00,15,01,19,00,FF,00,00,00,08,D2,BB,C2,B7,CB,B3,B7,E7,0D,01,15,01,19,00,00,FF,00,00,0E,CD,EE,42,39,43,38,39,31,C1,D9,CA,B1,B3,B5,00,0A,1C,CD,EE,42,39,43,38,39,31"
-//        val dex3 = "2C,C1,D9,CA,B1,B3,B5,2C,D7,A3,C4,FA,D2,BB,C2,B7,CB,B3,B7,E7,00,7A,0C"
+//            "BC,B8,FF,18,E5,A0,B8,67,7F,68,CB,B8,45,80,ED,B9,DB,B8,8B,15,76,78,65,18,9F,E0,07,C2,AF,B8,00,1E,A8,D0,FE,45,4A,88,82,97,D8,90,BA,54,4F,88,BA,D6,4A,B0,BA,C6,22,20,82,DD,D1,38,FE,F7,7F,F0,AE,85"
 //
-
-//        val dex1 = "00,64,FF,FF,6E,4D,00,02,00,15,01,19,00,FF,00,00,00,08,D2,BB,C2,B7,CB,B3,B7,E7,0D,01,15,01,19,00,00,FF,00,00,0E,CB,D5,45,4D,4A,32,36,31,C1,D9,CA,B1,B3,B5,00,0A,1C,CB,D5,45,4D,4A,32,36,31,2C,C1,D9,CA,B1,B3,B5,2C,D7,A3,C4,FA,D2,BB,C2,B7,CB,B3,B7,E7,00,39,46"
-////        val dex2 = "00,C8,FF,FF,E5,2F,01,01,00,01,78,00,81,76,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,20,CF,E6,46,51,45,33,37,33,2C,CD,A3,B3,B5,38,D0,A1,CA,B1,32,38,B7,D6,D6,D3,31,34,C3,EB,2C,C7,EB,BD,C9,B7,D1,35,D4,AA,42,4D,B2,00,00,00,00,00,00,00,3E,00,00,00,28,00,00,00,1D,00,00,00,E3,FF,FF,FF,01,00,01,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,FF,FF,FF,00,00,00,00,00,FE,9D,4B,F8,82,D7,CA,08,BA,27,8A,E8,BA,6E,22,E8,BA,BF,92,E8,82,E2,32,08,FE,AA,AB,F8,00,6B,58,00,F6,72,ED,98,D1,46,8B,68,E2,59,E3,68,34,B0,B0,B0,87,69,69,68,14,66,BC,B8,FF,18,E5,A0,B8,67,7F,68,CB,B8,45,80,ED,B9,DB,B8,8B,15,76,78,65,18,9F,E0,07,C2,AF,B8,00,1E,A8,D0,FE,45,4A,88,82,97,D8,90,BA,54,4F,88,BA,D6,4A,B0,BA,C6,22,20,82,DD,D1,38,FE,F7,7F,F0,67,EE"
+//        val dex = "00,64,FF,FF,6E,57,00,02,00,15,01,19,00,FF,00,00,00,08,D2,BB,C2,B7,CB,B3,B7,E7,0D,01,15,01,19,00,00,FF,00,00,17,CB,D5,45,41,44,33,33,30,35,C1,D9,CA,B1,B3,B5,D0,BB,D0,BB,BB,DD,B9,CB,00,0A,1D,CB,D5,45,41,44,33,33,30,35,2C,C1,D9,CA,B1,B3,B5,2C,D7,A3,C4,FA,D2,BB,C2,B7,CB,B3,B7,E7,00,5A,81"
+//
 //        lifecycleScope.launch {
-//            repeat(1) {
-//                val toByteArray = BigInteger(dex1.replace(",", ""), 16).toByteArray()
-//                val list =   LinkedList(
-//                    toByteArray
-//                        .joinToString(separator = ",") { eachByte ->
-//                            "%02x".format(eachByte)
-//                        }.split(",")
-//                )
+//            repeat(2) {
 //                val list = when (it) {
 //                    0 -> {
 //                        LinkedList(
-//                            BigInteger(dex1.replace(",", ""), 16).toByteArray()
-//                                .joinToString(separator = ",") { eachByte ->
-//                                    "%02x".format(eachByte)
-//                                }.split(",")
+//                            dex1.split(",").map { map ->
+//                                map.toInt(16)
+//                            }.joinToString(separator = ",") { eachByte ->
+//                                "%02x".format(eachByte)
+//                            }.split(",")
 //                        )
 //                    }
 //
 //                    1 -> {
 //                        LinkedList(
-//                            BigInteger(dex2.replace(",", ""), 16).toByteArray()
-//                                .joinToString(separator = ",") { eachByte ->
-//                                    "%02x".format(eachByte)
-//                                }.split(",")
+//                            dex2.split(",").map { map ->
+//                                map.toInt(16)
+//                            }.joinToString(separator = ",") { eachByte ->
+//                                "%02x".format(eachByte)
+//                            }.split(",")
 //                        )
 //                    }
 //
 //                    else -> {
 //                        LinkedList(
-//                            BigInteger(dex3.replace(",", ""), 16).toByteArray()
+//                            BigInteger(dex2.replace(",", ""), 16).toByteArray()
 //                                .joinToString(separator = ",") { eachByte ->
 //                                    "%02x".format(eachByte)
 //                                }.split(",")
@@ -325,7 +246,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
 //                    }
 //                }
 //            }
-
+//
 //        }
 
         SerialUtils.getInstance().setmSerialPortDirectorListens(object : SerialPortDirectorListens {
@@ -343,22 +264,26 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
                 Log.i(TAG, "onDataReceived [ String ]: " + String(bytes, Charset.forName("GB2312")))
 
                 lifecycleScope.launch(Dispatchers.Main) {
-                    val uppercase = (bytes.joinToString(separator = ",") { eachByte ->
-                        "%02x".format(eachByte)
-                    }).uppercase()
-                    withContext(Dispatchers.IO) {
-                        FileIOUtils.writeFileFromString(
-                            logFile,
-                            "APP开启第${count + 1}次收到消息:$uppercase", true
-                        )
-                        FileIOUtils.writeFileFromString(
-                            logFile,
-                            "\n", true
-                        )
-                        count++
-                    }
-                    if (binding.rvMsg.isVisible) {
-                        msgAdapter.submitList(msgAdapter.currentList + uppercase)
+                    try {
+                        val uppercase = (bytes.joinToString(separator = ",") { eachByte ->
+                            "%02x".format(eachByte)
+                        }).uppercase()
+                        withContext(Dispatchers.IO) {
+                            FileIOUtils.writeFileFromString(
+                                logFile,
+                                "APP开启第${count + 1}次收到消息:$uppercase", true
+                            )
+                            FileIOUtils.writeFileFromString(
+                                logFile,
+                                "\n", true
+                            )
+                            count++
+                        }
+                        if (binding.rvMsg.isVisible) {
+                            msgAdapter.submitList(msgAdapter.currentList + uppercase)
+                        }
+                    } catch (e: Exception) {
+                        e.printStackTrace()
                     }
                 }
 
@@ -425,11 +350,13 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         PermissionUtils.permission(PermissionConstants.STORAGE)
             .callback { isAllGranted, granted, deniedForever, denied ->
                 if (isAllGranted) {
+                    FileUtils.delete(logFile)
                     FileUtils.createOrExistsFile(logFile)
                 }
             }.request()
 
     }
+
 
     private val logFile =
         File(PathUtils.getExternalStoragePath() + File.separator + "parkingLog.txt")
@@ -457,20 +384,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
                         }
                     }
                 } else {
-                    try {
-                        parseHexList(
-                            LinkedList(list.subList(0, length)),
-                            serialPortEnum
-                        )
-                        val linkedList = LinkedList(list.subList(length - 1, list.size))
-                        handleList(
-                            linkedList,
-                            getLength(linkedList),
-                            parkingMsgType,
-                            serialPortEnum
-                        )
-                    } catch (_: Exception) {
-                    }
+                    partialData = null
                 }
             }
 
@@ -487,21 +401,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
                         }
                     }
                 } else {
-                    try {
-                        parsePayList(
-                            LinkedList(list.subList(0, length)),
-                            serialPortEnum
-                        )
-                        val linkedList = LinkedList(list.subList(length - 1, list.size))
-                        handleList(
-                            linkedList,
-                            getLength(linkedList),
-                            parkingMsgType,
-                            serialPortEnum
-                        )
-                    } catch (e: Exception) {
-                        e.printStackTrace()
-                    }
+                    partialData = null
                 }
 
             }
@@ -620,6 +520,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         }
         viewModel.dispatch(action = Action.Release(parkingInfoEntity))
         viewModel.onEvent(event = Event.Release)
+        partialData = null
         Log.d(TAG, "parseBytes: $parkingInfoEntity")
     }
 
@@ -684,6 +585,7 @@ class MainActivity : AppCompatActivity(), TextToSpeech.OnInitListener {
         }
         viewModel.dispatch(action = Action.Payment(payInfoEntity))
         viewModel.onEvent(Event.Payment)
+        partialData = null
         Log.d(TAG, "payEntity: $payInfoEntity")
     }
 
