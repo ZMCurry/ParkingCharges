@@ -9,12 +9,11 @@
 
     <ImageView
         android:id="@+id/iv_qr_code"
-        android:layout_width="match_parent"
-        android:layout_height="0dp"
+        android:layout_width="0dp"
+        android:layout_height="match_parent"
         android:layout_margin="5pt"
         android:scaleType="fitXY"
-        app:layout_constraintDimensionRatio="h,1:1"
-        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintDimensionRatio="w,1:1"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="parent" />
 
@@ -28,8 +27,8 @@
         android:textSize="@dimen/text_large"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/iv_qr_code"
+        app:layout_constraintStart_toEndOf="@id/iv_qr_code"
+        app:layout_constraintTop_toTopOf="parent"
         tools:text="临时车" />
 
 </androidx.constraintlayout.widget.ConstraintLayout>
